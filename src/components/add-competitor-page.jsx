@@ -3,34 +3,160 @@
 import Image from "next/image";
 import Link from "next/link";
 import {
-  ChefHat,
-  Coffee,
-  Crosshair,
   MapPin,
-  MousePointer2,
   Plus,
   Search,
-  UtensilsCrossed,
+  UserMinus,
+  Users,
 } from "lucide-react";
-import { useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
-  nearbyRecommendations,
-  trackedCompetitors,
-  trackedMeta,
-} from "@/mocks/add-competitor";
+  addCompetitorSetMember,
+  getCompetitorSet,
+  getCurrentPilot,
+  getSuggestedCompetitors,
+  removeCompetitorSetMember,
+  searchRestaurants,
+  setStoredPilotRestaurantId,
+} from "@/lib/api";
+import { restaurantImageSrc } from "@/lib/restaurant-image";
 
-function TrackedIcon({ type }) {
-  if (type === "coffee") {
-    return <Coffee className="size-5 text-[#5C6B47]" aria-hidden />;
-  }
-  if (type === "chef") {
-    return <ChefHat className="size-5 text-[#5C6B47]" aria-hidden />;
-  }
-  return <UtensilsCrossed className="size-5 text-[#5C6B47]" aria-hidden />;
+function formatMemberSource(source) {
+  if (!source) return "—";
+  return source.charAt(0).toUpperCase() + source.slice(1).toLowerCase();
 }
 
 export function AddCompetitorPage() {
+  const router = useRouter();
   const [query, setQuery] = useState("");
+  const [debouncedQ, setDebouncedQ] = useState("");
+  const [searchResults, setSearchResults] = useState([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [competitorSetId, setCompetitorSetId] = useState(null);
+  const [members, setMembers] = useState([]);
+  const [suggestions, setSuggestions] = useState([]);
+  const [loadError, setLoadError] = useState(null);
+  const [actionError, setActionError] = useState(null);
+  const [pendingId, setPendingId] = useState(null);
+
+  useEffect(() => {
+    const t = window.setTimeout(() => setDebouncedQ(query.trim()), 320);
+    return () => window.clearTimeout(t);
+  }, [query]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      await Promise.resolve();
+      if (cancelled) return;
+      if (debouncedQ.length < 2) {
+        setSearchResults([]);
+        setSearchLoading(false);
+        return;
+      }
+      setSearchLoading(true);
+      setActionError(null);
+      try {
+        const data = await searchRestaurants(debouncedQ, 15);
+        if (!cancelled) setSearchResults(data?.results ?? []);
+      } catch (e) {
+        if (!cancelled) {
+          setSearchResults([]);
+          setActionError(e.message || "Search failed");
+        }
+      } finally {
+        if (!cancelled) setSearchLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [debouncedQ]);
+
+  const refreshSet = useCallback(async (setId) => {
+    if (setId == null) return;
+    const data = await getCompetitorSet(setId);
+    const active = (data?.competitor_set?.members ?? []).filter(
+      (m) => m.removed_at == null,
+    );
+    setMembers(active);
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setLoadError(null);
+      try {
+        const cur = await getCurrentPilot();
+        const pr = cur?.pilot_restaurant;
+        if (!pr?.id) {
+          router.replace("/");
+          return;
+        }
+        setStoredPilotRestaurantId(pr.id);
+        const setId = pr.active_competitor_set_id;
+        if (!cancelled) setCompetitorSetId(setId ?? null);
+        if (setId) {
+          await refreshSet(setId);
+        } else if (!cancelled) {
+          setMembers([]);
+        }
+        const sug = await getSuggestedCompetitors(pr.id, 12);
+        if (!cancelled) setSuggestions(sug?.suggestions ?? []);
+      } catch (e) {
+        if (!cancelled) {
+          if (e.status === 404) router.replace("/");
+          else setLoadError(e.message || "Could not load");
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [refreshSet, router]);
+
+  const memberRestaurantIds = useMemo(
+    () => new Set(members.map((m) => m.restaurant_id)),
+    [members],
+  );
+
+  const addRestaurant = async (restaurantId) => {
+    if (competitorSetId == null) {
+      setActionError("No active competitor set. Finish onboarding first.");
+      return;
+    }
+    if (memberRestaurantIds.has(restaurantId)) {
+      setActionError("That restaurant is already in the set.");
+      return;
+    }
+    setActionError(null);
+    setPendingId(restaurantId);
+    try {
+      await addCompetitorSetMember(competitorSetId, restaurantId, "manual");
+      await refreshSet(competitorSetId);
+      setQuery("");
+      setSearchResults([]);
+    } catch (e) {
+      setActionError(e.message || "Could not add member");
+    } finally {
+      setPendingId(null);
+    }
+  };
+
+  const removeMember = async (member) => {
+    if (competitorSetId == null) return;
+    setActionError(null);
+    setPendingId(member.id);
+    try {
+      await removeCompetitorSetMember(competitorSetId, member.id);
+      await refreshSet(competitorSetId);
+    } catch (e) {
+      setActionError(e.message || "Could not remove");
+    } finally {
+      setPendingId(null);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-[#FDF8EE] text-[#2D2926]">
@@ -48,142 +174,187 @@ export function AddCompetitorPage() {
       </header>
 
       <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8 lg:py-10">
+        {loadError ? (
+          <p className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+            {loadError}
+          </p>
+        ) : null}
+        {actionError ? (
+          <p className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+            {actionError}
+          </p>
+        ) : null}
+
+        {!competitorSetId ? (
+          <p className="mb-6 text-sm text-[#666666]">
+            You need an active competitor set before adding venues.{" "}
+            <Link href="/competitors" className="font-semibold text-[#5C6B47] underline">
+              Complete onboarding
+            </Link>
+            .
+          </p>
+        ) : null}
+
         <div className="relative">
           <Search className="pointer-events-none absolute left-4 top-1/2 size-5 -translate-y-1/2 text-[#9CA3AF]" />
           <input
             type="search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search by restaurant name, cuisine, or location..."
+            placeholder="Search restaurants by name…"
             className="w-full rounded-2xl border border-[#E5E0D6] bg-white py-4 pl-12 pr-4 text-[15px] text-[#2D2926] shadow-sm outline-none placeholder:text-[#9CA3AF] focus:border-[#D4AF37]/50 focus:ring-2 focus:ring-[#FFD700]/25"
             aria-label="Search restaurants"
           />
         </div>
-        <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-xs text-[#6B7280]">
-            Enter at least 3 characters to find establishments globally.
-          </p>
-          <button
-            type="button"
-            className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#5C6B47] hover:underline"
-          >
-            <MousePointer2 className="size-3.5" aria-hidden />
-            Can&apos;t find it? Enter details manually
-          </button>
-        </div>
+        <p className="mt-3 text-xs text-[#6B7280]">
+          Type at least two characters to search the directory.
+        </p>
+
+        <section className="mt-10 rounded-2xl border border-[#E5E0D6] bg-gradient-to-b from-white to-[#FAFAF8] p-5 shadow-sm sm:p-7">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div className="flex gap-3">
+              <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-[#5C6B47]/10 text-[#5C6B47]">
+                <Users className="size-5" aria-hidden />
+              </span>
+              <div>
+                <h2 className="text-lg font-bold tracking-tight text-[#2D2926] sm:text-xl">
+                  Active set members
+                </h2>
+                <p className="mt-1 text-sm text-[#6B7280]">
+                  {members.length === 0
+                    ? "No venues in this competitor set yet."
+                    : `${members.length} restaurant${members.length === 1 ? "" : "s"} in your active set.`}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {members.length === 0 ? (
+            <p className="mt-6 rounded-xl border border-dashed border-[#D8D0C4] bg-white/80 px-4 py-10 text-center text-sm text-[#6B7280]">
+              Add venues from search or suggestions below.
+            </p>
+          ) : (
+            <ul className="mt-6 grid list-none grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {members.map((t) => (
+                <li key={t.id}>
+                  <div className="flex h-full flex-col rounded-xl border border-[#E8E4DC] bg-white p-4 shadow-sm ring-1 ring-black/[0.03] transition-shadow hover:shadow-md">
+                    <div className="min-w-0 flex-1 text-left">
+                      <p
+                        className="line-clamp-2 text-sm font-semibold leading-snug text-[#2D2926]"
+                        title={t.name || undefined}
+                      >
+                        {t.name || `Restaurant ${t.restaurant_id}`}
+                      </p>
+                      <div className="mt-2.5 flex flex-wrap items-center gap-2">
+                        <span className="inline-flex rounded-md bg-[#F5F2E9] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[#5C6B47]">
+                          {formatMemberSource(t.source)}
+                        </span>
+                        <span className="text-[11px] tabular-nums text-[#9CA3AF]">
+                          #{t.restaurant_id}
+                        </span>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={pendingId != null}
+                      onClick={() => removeMember(t)}
+                      className="mt-4 flex w-full items-center justify-center gap-1.5 rounded-lg border border-[#E8E4DC] bg-[#FAFAF8] py-2 text-xs font-medium text-[#57534E] transition-colors hover:border-[#D6D3D1] hover:bg-[#F5F5F4] hover:text-[#1C1917] disabled:cursor-not-allowed disabled:opacity-45"
+                    >
+                      <UserMinus className="size-3.5 shrink-0 opacity-70" aria-hidden />
+                      Remove from set
+                    </button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+
+        {searchLoading ? (
+          <p className="mt-4 text-sm text-[#666666]">Searching…</p>
+        ) : debouncedQ.length >= 2 && searchResults.length === 0 ? (
+          <p className="mt-4 text-sm text-[#666666]">No matches.</p>
+        ) : (
+          <ul className="mt-4 flex flex-col gap-2">
+            {searchResults.map((r) => (
+              <li
+                key={r.id}
+                className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#E8E4DC] bg-white p-3"
+              >
+                <div className="flex min-w-0 items-center gap-3">
+                  <div className="relative size-12 shrink-0 overflow-hidden rounded-lg bg-[#F0EBE3]">
+                    <Image
+                      src={restaurantImageSrc(r.image_url)}
+                      alt=""
+                      fill
+                      className="object-cover"
+                      sizes="48px"
+                    />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="font-bold">{r.name}</p>
+                    <p className="text-xs text-[#666666]">
+                      {[r.locality, r.area].filter(Boolean).join(" · ")}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  disabled={pendingId != null || !competitorSetId}
+                  onClick={() => addRestaurant(r.id)}
+                  className="inline-flex items-center gap-1 rounded-lg bg-[#FFD700] px-3 py-2 text-xs font-bold text-black disabled:opacity-45"
+                >
+                  <Plus className="size-4" aria-hidden />
+                  Add to set
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
 
         <div className="mt-10 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
           <h2 className="flex items-center gap-2 text-lg font-bold sm:text-xl">
             <MapPin className="size-5 text-[#5C6B47]" aria-hidden />
-            Nearby recommendations
+            Suggested nearby
           </h2>
-          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#9CA3AF]">
-            Based on your main location
-          </p>
         </div>
 
         <div className="mt-5 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {nearbyRecommendations.map((r) => (
+          {suggestions.map((r) => (
             <article
-              key={r.id}
-              className="flex flex-col overflow-hidden rounded-2xl border border-[#E8E4DC] bg-white shadow-md transition-shadow hover:shadow-lg"
+              key={r.restaurant_id}
+              className="flex flex-col overflow-hidden rounded-2xl border border-[#E8E4DC] bg-white shadow-md"
             >
-              <div className="flex items-start justify-between gap-2 p-4 pb-2">
-                <span className="rounded-md bg-[#E8DCC8] px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-[#3D2E26]">
-                  {r.category}
-                </span>
-                <button
-                  type="button"
-                  className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-[#FFD700] text-black shadow-sm transition-opacity hover:opacity-90"
-                  aria-label={`Add ${r.name}`}
-                >
-                  <Plus className="size-5 stroke-[2.5]" />
-                </button>
-              </div>
-              <div className="px-4">
-                <h3 className="text-lg font-bold">{r.name}</h3>
-                <p className="mt-1 flex items-center gap-1.5 text-sm text-[#666666]">
-                  <Crosshair className="size-3.5 shrink-0 text-[#9CA3AF]" aria-hidden />
-                  {r.rating} Rating • {r.distance}
-                </p>
-              </div>
-              <div className="relative mx-4 mt-3 aspect-[16/10] overflow-hidden rounded-xl bg-[#F0EBE3]">
+              <div className="relative aspect-[16/10] w-full bg-[#F0EBE3]">
                 <Image
-                  src={r.image}
+                  src={restaurantImageSrc(r.image_url)}
                   alt=""
                   fill
                   className="object-cover"
                   sizes="(max-width: 1024px) 100vw, 33vw"
                 />
               </div>
-              <div className="mt-3 flex items-center justify-between border-t border-[#EFEBE4] px-4 py-3">
-                <span className="text-[11px] font-bold uppercase tracking-wide text-[#666666]">
-                  Price: {r.price}
-                </span>
-                <span className={`text-xs ${r.footerClass}`}>{r.footerLabel}</span>
+              <div className="p-4">
+                <h3 className="text-lg font-bold">{r.name}</h3>
+                <p className="mt-1 text-sm text-[#666666]">
+                  {[r.locality, r.area].filter(Boolean).join(" · ")} ·{" "}
+                  {r.distance_km != null ? `${Number(r.distance_km).toFixed(2)} km` : ""}
+                </p>
+                <p className="mt-2 text-xs text-[#666666]">
+                  Score {r.suggestion_score != null ? String(r.suggestion_score) : "—"}
+                </p>
+                <button
+                  type="button"
+                  disabled={pendingId != null || !competitorSetId}
+                  onClick={() => addRestaurant(r.restaurant_id)}
+                  className="mt-3 w-full rounded-lg bg-[#5C6B47] py-2 text-sm font-bold text-white disabled:opacity-45"
+                >
+                  Add to set
+                </button>
               </div>
             </article>
           ))}
         </div>
-
-        <section className="mt-12 rounded-2xl border border-[#D8D0C4] bg-[#ECE6DC] p-5 shadow-inner sm:p-7">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-            <div>
-              <h2 className="text-lg font-bold sm:text-xl">{trackedMeta.title}</h2>
-              <p className="mt-1 text-sm text-[#666666]">{trackedMeta.subtitle}</p>
-            </div>
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="flex -space-x-2">
-                {["bg-[#93C5FD]", "bg-[#FCA5A5]", "bg-[#86EFAC]"].map((bg, i) => (
-                  <span
-                    key={i}
-                    className={`inline-flex size-9 items-center justify-center rounded-full border-2 border-[#ECE6DC] text-xs font-bold text-white ${bg}`}
-                    aria-hidden
-                  >
-                    {String.fromCharCode(65 + i)}
-                  </span>
-                ))}
-              </div>
-              <span className="flex size-9 items-center justify-center rounded-full border-2 border-dashed border-[#9CA3AF] bg-white text-xs font-bold text-[#666666]">
-                {trackedMeta.avatarOverflow}
-              </span>
-              <button
-                type="button"
-                className="rounded-xl border border-[#C4B8A8] bg-white px-4 py-2 text-xs font-bold text-[#2D2926] shadow-sm hover:bg-[#FAFAF7]"
-              >
-                Manage all
-              </button>
-            </div>
-          </div>
-
-          <div className="mt-6 flex gap-3 overflow-x-auto pb-1">
-            {trackedCompetitors.map((t) => (
-              <div
-                key={t.id}
-                className="flex min-w-[140px] flex-1 flex-col rounded-xl border border-[#E0D8CC] bg-white p-4 shadow-sm sm:min-w-[160px]"
-              >
-                <div className="flex size-10 items-center justify-center rounded-lg bg-[#F5F0E8]">
-                  <TrackedIcon type={t.icon} />
-                </div>
-                <p className="mt-3 text-sm font-bold">{t.name}</p>
-                <span
-                  className={`mt-2 inline-flex w-fit items-center gap-1 rounded-md border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${t.statusClass}`}
-                >
-                  {t.status}
-                </span>
-              </div>
-            ))}
-            <button
-              type="button"
-              className="flex min-w-[140px] flex-1 flex-col items-center justify-center rounded-xl border-2 border-dashed border-[#BFB5A4] bg-white/60 p-4 text-center transition-colors hover:bg-white sm:min-w-[160px]"
-            >
-              <span className="flex size-10 items-center justify-center rounded-full border-2 border-[#9CA3AF] text-[#666666]">
-                <Plus className="size-5" />
-              </span>
-              <p className="mt-3 text-sm font-bold text-[#666666]">New slot</p>
-            </button>
-          </div>
-        </section>
       </main>
     </div>
   );

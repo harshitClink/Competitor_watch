@@ -1,29 +1,89 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Building2, ChevronRight, Search } from "lucide-react";
-import { mockRestaurants } from "@/mocks/restaurants";
+import { useRouter } from "next/navigation";
+import Image from "next/image";
+import { ChevronRight, Search } from "lucide-react";
+import { restaurantImageSrc } from "@/lib/restaurant-image";
+import {
+  clearStoredChatSessionId,
+  searchRestaurants,
+  setPilotRestaurant,
+  setStoredPilotRestaurantId,
+} from "@/lib/api";
 
 export function PilotRestaurantSelection() {
+  const router = useRouter();
   const [query, setQuery] = useState("");
+  const [debouncedQ, setDebouncedQ] = useState("");
+  const [results, setResults] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
   const [selectedId, setSelectedId] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
 
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return mockRestaurants;
-    return mockRestaurants.filter(
-      (r) =>
-        r.name.toLowerCase().includes(q) ||
-        r.location.toLowerCase().includes(q),
-    );
+  useEffect(() => {
+    const t = window.setTimeout(() => setDebouncedQ(query.trim()), 320);
+    return () => window.clearTimeout(t);
   }, [query]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      await Promise.resolve();
+      if (cancelled) return;
+      if (debouncedQ.length < 2) {
+        setResults([]);
+        setError(null);
+        setLoading(false);
+        return;
+      }
+      setLoading(true);
+      setError(null);
+      try {
+        const data = await searchRestaurants(debouncedQ, 20);
+        if (!cancelled) setResults(data?.results ?? []);
+      } catch (e) {
+        if (!cancelled) {
+          setResults([]);
+          setError(e.message || "Search failed");
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [debouncedQ]);
+
+  const filtered = useMemo(() => results, [results]);
 
   const handleSearchKeyDown = useCallback((e) => {
     if (e.key === "Escape") {
       setQuery("");
     }
   }, []);
+
+  const continueWithSelection = useCallback(async () => {
+    if (selectedId == null) return;
+    setSubmitting(true);
+    setError(null);
+    try {
+      const data = await setPilotRestaurant(selectedId);
+      const pr = data?.pilot_restaurant;
+      if (pr?.id != null) {
+        setStoredPilotRestaurantId(pr.id);
+        clearStoredChatSessionId();
+      }
+      router.push("/competitors");
+    } catch (e) {
+      setError(e.message || "Could not save pilot restaurant");
+    } finally {
+      setSubmitting(false);
+    }
+  }, [router, selectedId]);
 
   return (
     <div className="flex min-h-screen flex-col bg-[#FFFBF0] text-[#1A1A1A]">
@@ -41,12 +101,6 @@ export function PilotRestaurantSelection() {
             <span className="h-1 flex-1 rounded-full bg-[#E5E2D8]" />
             <span className="h-1 flex-1 rounded-full bg-[#E5E2D8]" />
           </div>
-          <button
-            type="button"
-            className="text-sm font-medium text-[#6B7280] transition-colors hover:text-[#1A1A1A]"
-          >
-            Skip for now
-          </button>
         </div>
       </header>
 
@@ -78,12 +132,30 @@ export function PilotRestaurantSelection() {
             </span>
           </div>
 
+          <p className="mt-2 text-xs text-[#6B7280]">
+            Type at least two characters to search the directory.
+          </p>
+
+          {error ? (
+            <p className="mt-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+              {error}
+            </p>
+          ) : null}
+
           <p className="mt-6 text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9CA3AF]">
-            RECENT RESULTS
+            RESULTS
           </p>
 
           <div className="mt-2 overflow-hidden rounded-xl bg-[#F5F1E6]">
-            {filtered.length === 0 ? (
+            {loading ? (
+              <p className="px-4 py-8 text-center text-sm text-[#6B7280]">
+                Searching…
+              </p>
+            ) : debouncedQ.length < 2 ? (
+              <p className="px-4 py-8 text-center text-sm text-[#6B7280]">
+                Start typing to see restaurants.
+              </p>
+            ) : filtered.length === 0 ? (
               <p className="px-4 py-8 text-center text-sm text-[#6B7280]">
                 No restaurants match your search.
               </p>
@@ -91,6 +163,14 @@ export function PilotRestaurantSelection() {
               <ul className="divide-y divide-[#E8E0D4]">
                 {filtered.map((r) => {
                   const isSelected = selectedId === r.id;
+                  const loc = [r.locality, r.area].filter(Boolean).join(" · ");
+                  const rating =
+                    r.rating != null && r.rating !== ""
+                      ? `${r.rating}★`
+                      : null;
+                  const reviews =
+                    r.review_count != null ? `${r.review_count} reviews` : null;
+                  const badge = [rating, reviews].filter(Boolean).join(" · ");
                   return (
                     <li key={r.id}>
                       <button
@@ -104,23 +184,28 @@ export function PilotRestaurantSelection() {
                             : "hover:bg-[#EFEBE2]/80"
                         }`}
                       >
-                        <span
-                          className="flex size-10 shrink-0 items-center justify-center rounded-md bg-[#D9CFC4] sm:size-11"
-                          aria-hidden
-                        >
-                          <Building2 className="size-[18px] text-[#5C534C] sm:size-5" />
+                        <span className="relative flex size-10 shrink-0 overflow-hidden rounded-md bg-[#D9CFC4] sm:size-11">
+                          <Image
+                            src={restaurantImageSrc(r.image_url)}
+                            alt=""
+                            fill
+                            className="object-cover"
+                            sizes="44px"
+                          />
                         </span>
                         <div className="min-w-0 flex-1">
                           <p className="truncate text-sm font-bold text-[#1A1A1A] sm:text-[15px]">
                             {r.name}
                           </p>
                           <p className="mt-0.5 truncate text-xs text-[#6B7280] sm:text-sm">
-                            {r.location}
+                            {loc || "—"}
                           </p>
                         </div>
-                        <span className="inline-flex shrink-0 rounded-full border border-[#D4D0C8] bg-white px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-[#4B5563] sm:px-2.5 sm:py-1 sm:text-[10px]">
-                          {r.status}
-                        </span>
+                        {badge ? (
+                          <span className="inline-flex max-w-[40%] shrink-0 truncate rounded-full border border-[#D4D0C8] bg-white px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-[#4B5563] sm:px-2.5 sm:py-1 sm:text-[10px]">
+                            {badge}
+                          </span>
+                        ) : null}
                         <ChevronRight
                           className="size-5 shrink-0 text-[#9CA3AF]"
                           aria-hidden
@@ -142,12 +227,14 @@ export function PilotRestaurantSelection() {
               Continue with Selection
             </button>
           ) : (
-            <Link
-              href="/competitors"
-              className="mt-8 flex w-full items-center justify-center rounded-xl bg-[#FFD700] py-3.5 text-sm font-bold text-[#1A1A1A] shadow-sm transition-opacity hover:opacity-95 sm:py-4 sm:text-base"
+            <button
+              type="button"
+              disabled={submitting}
+              onClick={continueWithSelection}
+              className="mt-8 w-full rounded-xl bg-[#FFD700] py-3.5 text-sm font-bold text-[#1A1A1A] shadow-sm transition-opacity hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-45 sm:py-4 sm:text-base"
             >
-              Continue with Selection
-            </Link>
+              {submitting ? "Saving…" : "Continue with Selection"}
+            </button>
           )}
 
           <p className="mt-5 text-center text-sm text-[#6B7280]">
@@ -155,7 +242,7 @@ export function PilotRestaurantSelection() {
               href="/add-competitor"
               className="font-medium underline-offset-2 hover:text-[#1A1A1A] hover:underline"
             >
-              + Can&apos;t find your restaurant? Add it manually
+              + Add a tracked competitor later from the dashboard
             </Link>
           </p>
         </div>

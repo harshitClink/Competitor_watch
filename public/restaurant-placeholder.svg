@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600" viewBox="0 0 800 600" fill="none" role="img" aria-label="">
+  <defs>
+    <linearGradient id="rp-bg" x1="0" y1="0" x2="800" y2="600" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F7F2E8"/>
+      <stop offset="0.45" stop-color="#EDE6DA"/>
+      <stop offset="1" stop-color="#E5DDD0"/>
+    </linearGradient>
+    <linearGradient id="rp-accent" x1="400" y1="180" x2="400" y2="420" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#5C6B47" stop-opacity="0.22"/>
+      <stop offset="1" stop-color="#5C6B47" stop-opacity="0.08"/>
+    </linearGradient>
+  </defs>
+  <rect width="800" height="600" fill="url(#rp-bg)"/>
+  <ellipse cx="400" cy="320" rx="200" ry="72" fill="#FAFAF7" stroke="#D4CFC4" stroke-width="2" opacity="0.95"/>
+  <ellipse cx="400" cy="308" rx="168" ry="58" fill="url(#rp-accent)"/>
+  <path d="M352 248 L352 352 M368 232 L368 368" stroke="#5C6B47" stroke-width="10" stroke-linecap="round" opacity="0.35"/>
+  <path d="M432 232 L432 368 M448 248 L448 352" stroke="#5C6B47" stroke-width="10" stroke-linecap="round" opacity="0.35"/>
+  <circle cx="400" cy="285" r="6" fill="#D4AF37" opacity="0.85"/>
+  <path d="M388 265 Q400 248 412 265" stroke="#C4B8A8" stroke-width="3" stroke-linecap="round" fill="none" opacity="0.6"/>
+  <path d="M378 255 Q400 228 422 255" stroke="#C4B8A8" stroke-width="2.5" stroke-linecap="round" fill="none" opacity="0.45"/>
+</svg>

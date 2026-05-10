@@ -2,22 +2,34 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Bell, FileText, Menu, Send, Zap } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Bell, FileText, Send, Zap } from "lucide-react";
+import {
+  createChatSession,
+  getChatMessages,
+  getChatSession,
+  getCurrentPilot,
+  sendChatMessage,
+  setStoredChatSessionId,
+  setStoredPilotRestaurantId,
+  getStoredChatSessionId,
+} from "@/lib/api";
 import { AiAnalysisMessage } from "@/components/ai-analysis-message";
 import { ChatTypingIndicator } from "@/components/chat-typing-indicator";
-
-const TYPING_MS = 3000;
 
 function createId() {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 }
 
 export function AiChatbotPage() {
+  const router = useRouter();
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState([]);
+  const [sessionId, setSessionId] = useState(null);
   const [isAwaitingReply, setIsAwaitingReply] = useState(false);
+  const [loadError, setLoadError] = useState(null);
+  const [lastModel, setLastModel] = useState(null);
   const listRef = useRef(null);
-  const typingTimeoutRef = useRef(null);
 
   const scrollToBottom = useCallback(() => {
     const el = listRef.current;
@@ -31,39 +43,111 @@ export function AiChatbotPage() {
   }, [messages, scrollToBottom]);
 
   useEffect(() => {
-    return () => {
-      if (typingTimeoutRef.current !== null) {
-        window.clearTimeout(typingTimeoutRef.current);
-      }
-    };
-  }, []);
+    let cancelled = false;
+    (async () => {
+      setLoadError(null);
+      try {
+        const pilot = await getCurrentPilot();
+        const pr = pilot?.pilot_restaurant;
+        if (!pr?.id) {
+          router.replace("/");
+          return;
+        }
+        setStoredPilotRestaurantId(pr.id);
 
-  const send = useCallback(() => {
+        let sid = getStoredChatSessionId();
+        if (sid != null) {
+          try {
+            const s = await getChatSession(sid);
+            if (s?.chat_session?.pilot_restaurant_id !== pr.id) {
+              sid = null;
+            }
+          } catch {
+            sid = null;
+          }
+        }
+
+        if (sid == null) {
+          const created = await createChatSession(pr.id);
+          const newId = created?.chat_session?.id;
+          if (newId != null) {
+            setStoredChatSessionId(newId);
+            sid = newId;
+          }
+        }
+
+        if (cancelled) return;
+        setSessionId(sid);
+
+        if (sid != null) {
+          const transcript = await getChatMessages(sid);
+          const list = transcript?.messages ?? [];
+          if (!cancelled) {
+            setMessages(list);
+            const lastAssistant = [...list].reverse().find((m) => m.role === "assistant");
+            setLastModel(lastAssistant?.model_version ?? null);
+          }
+        }
+      } catch (e) {
+        if (!cancelled) {
+          if (e.status === 404) router.replace("/");
+          else setLoadError(e.message || "Could not start chat");
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [router]);
+
+  const send = useCallback(async () => {
     const text = input.trim();
-    if (!text || isAwaitingReply) return;
+    if (!text || isAwaitingReply || sessionId == null) return;
 
     setInput("");
     const typingId = createId();
+    const userMsgId = createId();
     setIsAwaitingReply(true);
     setMessages((prev) => [
       ...prev,
-      { id: createId(), role: "user", text },
+      { id: userMsgId, role: "user", content: text, created_at: new Date().toISOString() },
       { id: typingId, role: "typing" },
     ]);
 
-    if (typingTimeoutRef.current !== null) {
-      window.clearTimeout(typingTimeoutRef.current);
-    }
-    typingTimeoutRef.current = window.setTimeout(() => {
-      typingTimeoutRef.current = null;
-      setMessages((prev) =>
-        prev.map((m) =>
-          m.id === typingId ? { id: typingId, role: "assistant" } : m,
-        ),
-      );
+    try {
+      const data = await sendChatMessage(sessionId, text);
+      const am = data?.assistant_message;
+      setMessages((prev) => {
+        const withoutTyping = prev.filter((m) => m.id !== typingId);
+        if (!am) return withoutTyping;
+        return [
+          ...withoutTyping,
+          {
+            id: am.id,
+            role: "assistant",
+            content: am.content,
+            citations: am.citations,
+            model_version: am.model_version,
+            created_at: am.created_at,
+          },
+        ];
+      });
+      if (am?.model_version) setLastModel(am.model_version);
+    } catch (e) {
+      setMessages((prev) => prev.filter((m) => m.id !== typingId));
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: createId(),
+          role: "assistant",
+          content: `Error: ${e.message || "Request failed"}`,
+          model_version: null,
+        },
+      ]);
+    } finally {
       setIsAwaitingReply(false);
-    }, TYPING_MS);
-  }, [input, isAwaitingReply]);
+    }
+  }, [input, isAwaitingReply, sessionId]);
 
   const onKeyDown = useCallback(
     (e) => {
@@ -75,20 +159,13 @@ export function AiChatbotPage() {
     [send],
   );
 
-  const showWelcome = messages.length === 0;
+  const showWelcome = messages.length === 0 && !loadError;
 
   return (
     <div className="flex h-[100dvh] flex-col bg-[#FDF8EE] text-[#2D2926]">
       <header className="z-40 shrink-0 border-b border-[#E8E4DC] bg-[#FAFAF7]/95 backdrop-blur-sm">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3 sm:px-6 lg:px-8">
           <div className="flex min-w-0 items-center gap-2 sm:gap-4">
-            <button
-              type="button"
-              className="rounded-lg p-2 text-[#2D2926] hover:bg-[#F0EBE3]"
-              aria-label="Open menu"
-            >
-              <Menu className="size-5" />
-            </button>
             <nav
               className="flex min-w-0 items-center gap-3 overflow-x-auto text-sm sm:gap-6"
               aria-label="Main"
@@ -125,9 +202,6 @@ export function AiChatbotPage() {
             >
               <Bell className="size-5" />
             </button>
-            <span className="flex size-9 items-center justify-center rounded-full bg-[#E5E0D6] text-xs font-bold text-[#2D2926]">
-              JD
-            </span>
           </div>
         </div>
         <Link
@@ -137,6 +211,12 @@ export function AiChatbotPage() {
           Add Competitor
         </Link>
       </header>
+
+      {loadError ? (
+        <div className="shrink-0 border-b border-red-200 bg-red-50 px-4 py-2 text-center text-sm text-red-800">
+          {loadError}
+        </div>
+      ) : null}
 
       <div
         ref={listRef}
@@ -152,8 +232,8 @@ export function AiChatbotPage() {
                 How can I help you today?
               </h1>
               <p className="mt-2 max-w-md text-sm text-[#666666] sm:text-base">
-                Query live restaurant data, competitor performance, and market trends in
-                real-time.
+                Ask questions about your pilot restaurant and tracked competitors. Replies use
+                live API data on the backend.
               </p>
             </div>
           ) : null}
@@ -162,7 +242,7 @@ export function AiChatbotPage() {
             m.role === "user" ? (
               <div key={m.id} className="flex justify-end">
                 <div className="max-w-[85%] rounded-2xl bg-[#E8E4DC] px-4 py-3 text-left text-sm text-[#2D2926] sm:max-w-[75%] sm:text-[15px]">
-                  {m.text}
+                  {m.content}
                 </div>
               </div>
             ) : m.role === "typing" ? (
@@ -171,7 +251,11 @@ export function AiChatbotPage() {
               </div>
             ) : (
               <div key={m.id} className="flex justify-start">
-                <AiAnalysisMessage />
+                <AiAnalysisMessage
+                  content={m.content}
+                  citations={m.citations}
+                  modelVersion={m.model_version}
+                />
               </div>
             ),
           )}
@@ -187,15 +271,15 @@ export function AiChatbotPage() {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={onKeyDown}
-              disabled={isAwaitingReply}
-              placeholder="How is Bawarchi doing this month?"
+              disabled={isAwaitingReply || sessionId == null}
+              placeholder="Ask about pricing, menus, or competitors…"
               className="min-w-0 flex-1 bg-transparent py-2 text-sm text-[#2D2926] outline-none placeholder:text-[#9CA3AF] enabled:opacity-100 disabled:opacity-50 sm:text-[15px]"
               aria-label="Message DineIntel AI"
             />
             <button
               type="button"
               onClick={send}
-              disabled={isAwaitingReply}
+              disabled={isAwaitingReply || sessionId == null}
               className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-[#FFD700] text-black shadow-sm transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-45"
               aria-label="Send message"
             >
@@ -204,9 +288,11 @@ export function AiChatbotPage() {
           </div>
           <div className="mt-3 flex flex-col gap-1 text-[11px] text-[#888888] sm:flex-row sm:justify-between">
             <p>DineIntel AI can make mistakes. Verify critical data.</p>
-            <p className="font-medium uppercase tracking-wide sm:text-right">
-              Model: Intel-v6.2-Pro
-            </p>
+            {lastModel ? (
+              <p className="font-medium uppercase tracking-wide sm:text-right">
+                Model: {lastModel}
+              </p>
+            ) : null}
           </div>
         </div>
       </footer>
