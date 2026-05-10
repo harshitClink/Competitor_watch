@@ -6,7 +6,6 @@ import { Fraunces } from "next/font/google";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  Bell,
   Plus,
   Sparkles,
   Zap,
@@ -291,13 +290,6 @@ export function DailyDigestDashboard() {
             >
               Add Competitor
             </Link>
-            <button
-              type="button"
-              className="rounded-full p-2 text-[#2D2926] hover:bg-[#F0EBE3]"
-              aria-label="Notifications"
-            >
-              <Bell className="size-5" />
-            </button>
           </div>
         </div>
       </header>

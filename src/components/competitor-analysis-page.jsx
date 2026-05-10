@@ -5,7 +5,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Fraunces } from "next/font/google";
 import {
-  Bell,
   Minus,
   Plus,
   Search,
@@ -181,13 +180,6 @@ export function CompetitorAnalysisPage() {
             >
               Add Competitor
             </Link>
-            <button
-              type="button"
-              className="rounded-full p-2 text-[#2D2926] hover:bg-[#F0EBE3]"
-              aria-label="Notifications"
-            >
-              <Bell className="size-5" />
-            </button>
           </div>
         </div>
       </header>

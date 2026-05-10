@@ -5,7 +5,6 @@ import Link from "next/link";
 import { Fraunces } from "next/font/google";
 import { useRouter } from "next/navigation";
 import {
-  Bell,
   ChevronLeft,
   FileText,
   MessageSquare,
@@ -459,13 +458,6 @@ export function AiChatbotPage() {
             >
               Add Competitor
             </Link>
-            <button
-              type="button"
-              className="rounded-full p-2 text-[#2D2926] hover:bg-[#F0EBE3]"
-              aria-label="Notifications"
-            >
-              <Bell className="size-5" />
-            </button>
           </div>
         </div>
         <Link
