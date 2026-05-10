@@ -117,6 +117,10 @@ export function getSuggestedCompetitors(pilotId, limit = 12) {
   return apiFetch(`/pilot_restaurants/${pilotId}/suggested_competitors?${params}`);
 }
 
+export function getSuggestedQuestions(pilotId) {
+  return apiFetch(`/pilot_restaurants/${pilotId}/suggested_questions`);
+}
+
 export function createCompetitorSet(body) {
   return apiFetch("/competitor_sets", {
     method: "POST",
