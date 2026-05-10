@@ -4,7 +4,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import { ChevronRight, Search } from "lucide-react";
+import { ChevronRight, Loader2, Search } from "lucide-react";
+import { ApiLoader } from "@/components/api-loading";
 import { restaurantImageSrc } from "@/lib/restaurant-image";
 import {
   clearStoredChatSessionId,
@@ -148,9 +149,11 @@ export function PilotRestaurantSelection() {
 
           <div className="mt-2 overflow-hidden rounded-xl bg-[#F5F1E6]">
             {loading ? (
-              <p className="px-4 py-8 text-center text-sm text-[#6B7280]">
-                Searching…
-              </p>
+              <ApiLoader
+                message="Searching restaurants…"
+                size="section"
+                className="px-4"
+              />
             ) : debouncedQ.length < 2 ? (
               <p className="px-4 py-8 text-center text-sm text-[#6B7280]">
                 Start typing to see restaurants.
@@ -231,9 +234,16 @@ export function PilotRestaurantSelection() {
               type="button"
               disabled={submitting}
               onClick={continueWithSelection}
-              className="mt-8 w-full rounded-xl bg-[#FFD700] py-3.5 text-sm font-bold text-[#1A1A1A] shadow-sm transition-opacity hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-45 sm:py-4 sm:text-base"
+              className="mt-8 flex w-full items-center justify-center gap-2 rounded-xl bg-[#FFD700] py-3.5 text-sm font-bold text-[#1A1A1A] shadow-sm transition-opacity hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-45 sm:py-4 sm:text-base"
             >
-              {submitting ? "Saving…" : "Continue with Selection"}
+              {submitting ? (
+                <>
+                  <Loader2 className="size-5 animate-spin" aria-hidden />
+                  Saving pilot…
+                </>
+              ) : (
+                "Continue with Selection"
+              )}
             </button>
           )}
 

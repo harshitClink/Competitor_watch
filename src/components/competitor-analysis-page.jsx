@@ -17,6 +17,7 @@ import {
   getLeaderboard,
   setStoredPilotRestaurantId,
 } from "@/lib/api";
+import { ApiLoader } from "@/components/api-loading";
 
 const fraunces = Fraunces({
   subsets: ["latin"],
@@ -66,6 +67,8 @@ export function CompetitorAnalysisPage() {
   );
   const [rows, setRows] = useState([]);
   const [loadError, setLoadError] = useState(null);
+  const [pilotLoading, setPilotLoading] = useState(true);
+  const [leaderboardLoading, setLeaderboardLoading] = useState(false);
 
   const loadPilot = useCallback(async () => {
     const cur = await getCurrentPilot();
@@ -83,6 +86,7 @@ export function CompetitorAnalysisPage() {
     let cancelled = false;
     (async () => {
       setLoadError(null);
+      setPilotLoading(true);
       try {
         await loadPilot();
       } catch (e) {
@@ -90,6 +94,8 @@ export function CompetitorAnalysisPage() {
           if (e.status === 404) router.replace("/");
           else setLoadError(e.message || "Could not load pilot");
         }
+      } finally {
+        if (!cancelled) setPilotLoading(false);
       }
     })();
     return () => {
@@ -104,8 +110,10 @@ export function CompetitorAnalysisPage() {
       if (cancelled) return;
       if (competitorSetId == null) {
         setRows([]);
+        setLeaderboardLoading(false);
         return;
       }
+      setLeaderboardLoading(true);
       try {
         const data = await getLeaderboard(competitorSetId, leaderboardDate);
         if (!cancelled) setRows(data?.leaderboard ?? []);
@@ -114,6 +122,8 @@ export function CompetitorAnalysisPage() {
           setRows([]);
           setLoadError(e.message || "Could not load leaderboard");
         }
+      } finally {
+        if (!cancelled) setLeaderboardLoading(false);
       }
     })();
     return () => {
@@ -186,6 +196,12 @@ export function CompetitorAnalysisPage() {
           </p>
         ) : null}
 
+        {pilotLoading && !loadError ? (
+          <ApiLoader message="Loading competitor analysis…" size="page" />
+        ) : null}
+
+        {!pilotLoading || loadError ? (
+        <>
         <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between lg:gap-8">
           <div className="min-w-0 flex-1 lg:max-w-2xl">
             <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#888888]">
@@ -249,6 +265,8 @@ export function CompetitorAnalysisPage() {
             <p className="p-8 text-center text-sm text-[#666666]">
               Set up a competitor set from onboarding to see the leaderboard.
             </p>
+          ) : leaderboardLoading ? (
+            <ApiLoader message="Loading leaderboard…" size="section" className="min-h-[280px]" />
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full min-w-[640px] text-left text-sm">
@@ -305,13 +323,13 @@ export function CompetitorAnalysisPage() {
             </div>
           )}
 
-          {competitorSetId && filteredRows.length === 0 ? (
+          {competitorSetId && !leaderboardLoading && filteredRows.length === 0 ? (
             <p className="p-8 text-center text-sm text-[#666666]">
               No rows for this date or filter.
             </p>
           ) : null}
 
-          {competitorSetId ? (
+          {competitorSetId && !leaderboardLoading ? (
             <div className="border-t border-[#EFEBE4] px-5 py-4">
               <p className="text-xs text-[#666666]">
                 Showing {filteredRows.length} of {rows.length} restaurants
@@ -319,6 +337,8 @@ export function CompetitorAnalysisPage() {
             </div>
           ) : null}
         </section>
+        </>
+        ) : null}
       </main>
 
       <Link

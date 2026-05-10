@@ -20,6 +20,7 @@ import {
   searchRestaurants,
   setStoredPilotRestaurantId,
 } from "@/lib/api";
+import { ApiLoader } from "@/components/api-loading";
 import { restaurantImageSrc } from "@/lib/restaurant-image";
 
 function formatMemberSource(source) {
@@ -39,6 +40,7 @@ export function AddCompetitorPage() {
   const [loadError, setLoadError] = useState(null);
   const [actionError, setActionError] = useState(null);
   const [pendingId, setPendingId] = useState(null);
+  const [pageLoading, setPageLoading] = useState(true);
 
   useEffect(() => {
     const t = window.setTimeout(() => setDebouncedQ(query.trim()), 320);
@@ -109,6 +111,8 @@ export function AddCompetitorPage() {
           if (e.status === 404) router.replace("/");
           else setLoadError(e.message || "Could not load");
         }
+      } finally {
+        if (!cancelled) setPageLoading(false);
       }
     })();
     return () => {
@@ -179,6 +183,13 @@ export function AddCompetitorPage() {
             {loadError}
           </p>
         ) : null}
+
+        {pageLoading && !loadError ? (
+          <ApiLoader message="Loading competitor set and suggestions…" size="page" />
+        ) : null}
+
+        {pageLoading && !loadError ? null : (
+          <>
         {actionError ? (
           <p className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
             {actionError}
@@ -271,7 +282,7 @@ export function AddCompetitorPage() {
         </section>
 
         {searchLoading ? (
-          <p className="mt-4 text-sm text-[#666666]">Searching…</p>
+          <ApiLoader message="Searching restaurants…" size="inline" className="mt-4 justify-start" />
         ) : debouncedQ.length >= 2 && searchResults.length === 0 ? (
           <p className="mt-4 text-sm text-[#666666]">No matches.</p>
         ) : (
@@ -355,6 +366,8 @@ export function AddCompetitorPage() {
             </article>
           ))}
         </div>
+          </>
+        )}
       </main>
     </div>
   );

@@ -10,6 +10,7 @@ import {
   getSuggestedCompetitors,
   setStoredPilotRestaurantId,
 } from "@/lib/api";
+import { ApiLoader } from "@/components/api-loading";
 import { CompetitorCard } from "@/components/competitor-card";
 import { DashboardSetupLoading } from "@/components/dashboard-setup-loading";
 
@@ -189,6 +190,12 @@ export function CompetitorSelection() {
           </p>
         ) : null}
 
+        {suggestionsLoading && !loadError ? (
+          <ApiLoader message="Loading suggested competitors…" size="page" className="min-h-[45vh]" />
+        ) : null}
+
+        {!suggestionsLoading || loadError ? (
+        <>
         <div className="flex flex-col gap-3 rounded-xl border border-[#D8D4CA] bg-[#F5F2E9] p-3 sm:flex-row sm:items-center sm:gap-3 sm:p-2 sm:pr-2">
           <div className="relative min-h-[48px] flex-1">
             <Search
@@ -245,6 +252,8 @@ export function CompetitorSelection() {
           <p className="mt-8 text-center text-sm text-[#666666]">
             No venues match your filter.
           </p>
+        ) : null}
+        </>
         ) : null}
       </div>
     </div>

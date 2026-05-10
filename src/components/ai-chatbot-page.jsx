@@ -15,6 +15,7 @@ import {
   getStoredChatSessionId,
 } from "@/lib/api";
 import { AiAnalysisMessage } from "@/components/ai-analysis-message";
+import { ApiLoader } from "@/components/api-loading";
 import { ChatTypingIndicator } from "@/components/chat-typing-indicator";
 
 function createId() {
@@ -29,6 +30,7 @@ export function AiChatbotPage() {
   const [isAwaitingReply, setIsAwaitingReply] = useState(false);
   const [loadError, setLoadError] = useState(null);
   const [lastModel, setLastModel] = useState(null);
+  const [chatInitializing, setChatInitializing] = useState(true);
   const listRef = useRef(null);
 
   const scrollToBottom = useCallback(() => {
@@ -93,6 +95,8 @@ export function AiChatbotPage() {
           if (e.status === 404) router.replace("/");
           else setLoadError(e.message || "Could not start chat");
         }
+      } finally {
+        if (!cancelled) setChatInitializing(false);
       }
     })();
     return () => {
@@ -159,7 +163,8 @@ export function AiChatbotPage() {
     [send],
   );
 
-  const showWelcome = messages.length === 0 && !loadError;
+  const showWelcome =
+    messages.length === 0 && !loadError && !chatInitializing;
 
   return (
     <div className="flex h-[100dvh] flex-col bg-[#FDF8EE] text-[#2D2926]">
@@ -223,6 +228,9 @@ export function AiChatbotPage() {
         className="min-h-0 flex-1 overflow-y-auto px-4 py-6 sm:px-6 lg:px-8"
       >
         <div className="mx-auto flex max-w-3xl flex-col gap-6 pb-4">
+          {chatInitializing && !loadError ? (
+            <ApiLoader message="Connecting to chat…" size="page" className="min-h-[40vh]" />
+          ) : null}
           {showWelcome ? (
             <div className="flex flex-col items-center px-2 pt-4 text-center sm:pt-8">
               <div className="flex size-14 items-center justify-center rounded-xl bg-[#FFD700] shadow-sm">
@@ -271,7 +279,7 @@ export function AiChatbotPage() {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={onKeyDown}
-              disabled={isAwaitingReply || sessionId == null}
+              disabled={isAwaitingReply || sessionId == null || chatInitializing}
               placeholder="Ask about pricing, menus, or competitors…"
               className="min-w-0 flex-1 bg-transparent py-2 text-sm text-[#2D2926] outline-none placeholder:text-[#9CA3AF] enabled:opacity-100 disabled:opacity-50 sm:text-[15px]"
               aria-label="Message DineIntel AI"
@@ -279,7 +287,7 @@ export function AiChatbotPage() {
             <button
               type="button"
               onClick={send}
-              disabled={isAwaitingReply || sessionId == null}
+              disabled={isAwaitingReply || sessionId == null || chatInitializing}
               className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-[#FFD700] text-black shadow-sm transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-45"
               aria-label="Send message"
             >

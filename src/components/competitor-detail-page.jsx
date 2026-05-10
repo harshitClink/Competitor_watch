@@ -26,6 +26,7 @@ import {
   getThreatAssessments,
   setStoredPilotRestaurantId,
 } from "@/lib/api";
+import { ApiLoader } from "@/components/api-loading";
 import { restaurantImageSrc } from "@/lib/restaurant-image";
 
 const fraunces = Fraunces({
@@ -100,6 +101,7 @@ export function CompetitorDetailPage({ slug }) {
   const [socialPosts, setSocialPosts] = useState([]);
   const [serp, setSerp] = useState(null);
   const [loadError, setLoadError] = useState(null);
+  const [profileLoading, setProfileLoading] = useState(true);
   const [feedFilter, setFeedFilter] = useState("all");
 
   const loadPilot = useCallback(async () => {
@@ -121,12 +123,15 @@ export function CompetitorDetailPage({ slug }) {
     let cancelled = false;
     (async () => {
       setLoadError(null);
+      setProfileLoading(true);
       try {
         await loadPilot();
         const res = await getRestaurant(restaurantId);
         if (!cancelled) setRestaurant(res?.restaurant ?? null);
       } catch (e) {
         if (!cancelled) setLoadError(e.message || "Failed to load restaurant");
+      } finally {
+        if (!cancelled) setProfileLoading(false);
       }
     })();
     return () => {
@@ -345,6 +350,27 @@ export function CompetitorDetailPage({ slug }) {
         <Link href="/competitor-analysis" className="mt-4 inline-block text-[#5C6B47] underline">
           Back to analysis
         </Link>
+      </div>
+    );
+  }
+
+  if (profileLoading && !loadError) {
+    return (
+      <div className="min-h-screen bg-[#FDF8EE] pb-16 text-[#2D2926]">
+        <div className="border-b border-[#E8E4DC] bg-[#FAFAF7]">
+          <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-3 sm:px-6 lg:px-8">
+            <Link
+              href="/competitor-analysis"
+              className="inline-flex items-center gap-1 text-sm font-medium text-[#5C6B47] hover:underline"
+            >
+              <ArrowLeft className="size-4" aria-hidden />
+              Back
+            </Link>
+          </div>
+        </div>
+        <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+          <ApiLoader message="Loading restaurant profile…" size="page" />
+        </main>
       </div>
     );
   }

@@ -19,6 +19,7 @@ import {
   listDailyDigests,
   setStoredPilotRestaurantId,
 } from "@/lib/api";
+import { ApiLoader } from "@/components/api-loading";
 
 const LeaderboardScoreChart = dynamic(
   () =>
@@ -106,6 +107,10 @@ export function DailyDigestDashboard() {
   const [history, setHistory] = useState(null);
   const [leaderboardNames, setLeaderboardNames] = useState({});
   const [loadError, setLoadError] = useState(null);
+  const [pilotBootstrapDone, setPilotBootstrapDone] = useState(false);
+  const [digestLoading, setDigestLoading] = useState(false);
+  const [digestListLoading, setDigestListLoading] = useState(false);
+  const [historyLoading, setHistoryLoading] = useState(false);
 
   const loadPilot = useCallback(async () => {
     setLoadError(null);
@@ -132,6 +137,8 @@ export function DailyDigestDashboard() {
           if (e.status === 404) router.replace("/");
           else setLoadError(e.message || "Could not load pilot");
         }
+      } finally {
+        if (!cancelled) setPilotBootstrapDone(true);
       }
     })();
     return () => {
@@ -143,6 +150,7 @@ export function DailyDigestDashboard() {
     if (pilotRecordId == null) return;
     let cancelled = false;
     (async () => {
+      setDigestLoading(true);
       setDigestError(null);
       try {
         const data = await getDailyDigest(pilotRecordId, selectedDate);
@@ -154,6 +162,8 @@ export function DailyDigestDashboard() {
             setDigestError(e.message || "Could not load digest");
           }
         }
+      } finally {
+        if (!cancelled) setDigestLoading(false);
       }
     })();
     return () => {
@@ -165,11 +175,14 @@ export function DailyDigestDashboard() {
     if (pilotRecordId == null) return;
     let cancelled = false;
     (async () => {
+      setDigestListLoading(true);
       try {
         const list = await listDailyDigests(pilotRecordId);
         if (!cancelled) setDigestList(list?.daily_digests ?? []);
       } catch {
         if (!cancelled) setDigestList([]);
+      } finally {
+        if (!cancelled) setDigestListLoading(false);
       }
     })();
     return () => {
@@ -184,13 +197,17 @@ export function DailyDigestDashboard() {
       if (cancelled) return;
       if (competitorSetId == null) {
         setHistory(null);
+        setHistoryLoading(false);
         return;
       }
+      setHistoryLoading(true);
       try {
         const h = await getLeaderboardHistory(competitorSetId);
         if (!cancelled) setHistory(h?.history ?? null);
       } catch {
         if (!cancelled) setHistory(null);
+      } finally {
+        if (!cancelled) setHistoryLoading(false);
       }
     })();
     return () => {
@@ -288,6 +305,12 @@ export function DailyDigestDashboard() {
           </p>
         ) : null}
 
+        {!pilotBootstrapDone && !loadError ? (
+          <ApiLoader message="Loading your workspace…" size="page" />
+        ) : null}
+
+        {pilotBootstrapDone || loadError ? (
+        <>
         <div className="grid gap-5 lg:grid-cols-[1fr_220px] lg:gap-6">
           <div className="grid gap-5 lg:col-span-1 lg:grid-cols-3 lg:gap-6">
             <section className="rounded-2xl border border-[#E5E0D6] bg-white p-5 shadow-sm sm:p-6 lg:col-span-2">
@@ -303,24 +326,30 @@ export function DailyDigestDashboard() {
                   </span>
                 ) : null}
               </h2>
-              {digestError ? (
-                <p className="mt-3 text-sm text-red-700">{digestError}</p>
-              ) : null}
-              {digest?.summary ? (
-                <p className="mt-3 text-sm leading-relaxed text-[#666666] sm:text-[15px]">
-                  {digest.summary}
-                </p>
-              ) : !digest && pilotRecordId ? (
-                <p className="mt-3 text-sm text-[#666666]">
-                  No digest published for this date yet.
-                </p>
-              ) : null}
-              {digest?.status ? (
-                <p className="mt-4 text-[10px] font-semibold uppercase tracking-wide text-[#888888]">
-                  Status: {digest.status}
-                  {generatedAt ? ` · Generated ${generatedAt}` : ""}
-                </p>
-              ) : null}
+              {digestLoading ? (
+                <ApiLoader message="Loading digest…" size="inline" className="items-start py-8" />
+              ) : (
+                <>
+                  {digestError ? (
+                    <p className="mt-3 text-sm text-red-700">{digestError}</p>
+                  ) : null}
+                  {digest?.summary ? (
+                    <p className="mt-3 text-sm leading-relaxed text-[#666666] sm:text-[15px]">
+                      {digest.summary}
+                    </p>
+                  ) : !digest && pilotRecordId ? (
+                    <p className="mt-3 text-sm text-[#666666]">
+                      No digest published for this date yet.
+                    </p>
+                  ) : null}
+                  {digest?.status ? (
+                    <p className="mt-4 text-[10px] font-semibold uppercase tracking-wide text-[#888888]">
+                      Status: {digest.status}
+                      {generatedAt ? ` · Generated ${generatedAt}` : ""}
+                    </p>
+                  ) : null}
+                </>
+              )}
             </section>
 
             <section className="flex flex-col justify-between rounded-2xl bg-[#5C6B47] p-6 text-white shadow-sm sm:p-7">
@@ -344,6 +373,9 @@ export function DailyDigestDashboard() {
             <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#888888]">
               Digest dates
             </p>
+            {digestListLoading ? (
+              <ApiLoader message="Loading dates…" size="compact" className="mt-4 justify-start py-6" />
+            ) : null}
             <ul className="mt-3 flex flex-col gap-1">
               {digestList.map((d) => (
                 <li key={d.id}>
@@ -382,7 +414,9 @@ export function DailyDigestDashboard() {
             ) : null}
           </div>
 
-          {digestCards.length === 0 ? (
+          {digestLoading ? (
+            <ApiLoader message="Loading highlights…" size="section" className="min-h-[120px]" />
+          ) : digestCards.length === 0 ? (
             <p className="text-sm text-[#666666]">
               {digest?.quiet_day
                 ? "No competitor cards for this digest."
@@ -457,12 +491,18 @@ export function DailyDigestDashboard() {
             <p className="mt-3 text-sm text-[#666666]">
               Complete competitor onboarding to see score trends for your set.
             </p>
+          ) : historyLoading ? (
+            <div className="mt-4 min-w-0">
+              <ApiLoader message="Loading score history…" size="section" className="min-h-[220px] sm:min-h-[260px]" />
+            </div>
           ) : (
             <div className="mt-4 min-w-0">
               <LeaderboardScoreChart chartData={chartData} lineKeys={lineKeys} />
             </div>
           )}
         </section>
+        </>
+        ) : null}
       </main>
 
       <Link
