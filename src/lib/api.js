@@ -233,6 +233,14 @@ export function getSerpPresence(id, date) {
   return apiFetch(`/restaurants/${id}/serp_presence${q ? `?${q}` : ""}`);
 }
 
+export function getGoogleReviews(id, since = "7d", limit = 20) {
+  const params = new URLSearchParams({
+    since,
+    limit: String(limit),
+  });
+  return apiFetch(`/restaurants/${id}/google_reviews?${params}`);
+}
+
 export function createChatSession(pilotRestaurantId, title) {
   const body = { pilot_restaurant_id: pilotRestaurantId };
   if (title) body.title = title;

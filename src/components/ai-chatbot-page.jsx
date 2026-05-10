@@ -35,7 +35,6 @@ export function AiChatbotPage() {
   const [sessionId, setSessionId] = useState(null);
   const [isAwaitingReply, setIsAwaitingReply] = useState(false);
   const [loadError, setLoadError] = useState(null);
-  const [lastModel, setLastModel] = useState(null);
   const [chatInitializing, setChatInitializing] = useState(true);
   const listRef = useRef(null);
 
@@ -92,8 +91,6 @@ export function AiChatbotPage() {
           const list = transcript?.messages ?? [];
           if (!cancelled) {
             setMessages(list);
-            const lastAssistant = [...list].reverse().find((m) => m.role === "assistant");
-            setLastModel(lastAssistant?.model_version ?? null);
           }
         }
       } catch (e) {
@@ -137,12 +134,10 @@ export function AiChatbotPage() {
             role: "assistant",
             content: am.content,
             citations: am.citations,
-            model_version: am.model_version,
             created_at: am.created_at,
           },
         ];
       });
-      if (am?.model_version) setLastModel(am.model_version);
     } catch (e) {
       setMessages((prev) => prev.filter((m) => m.id !== typingId));
       setMessages((prev) => [
@@ -151,7 +146,6 @@ export function AiChatbotPage() {
           id: createId(),
           role: "assistant",
           content: `Error: ${e.message || "Request failed"}`,
-          model_version: null,
         },
       ]);
     } finally {
@@ -275,7 +269,6 @@ export function AiChatbotPage() {
                 <AiAnalysisMessage
                   content={m.content}
                   citations={m.citations}
-                  modelVersion={m.model_version}
                 />
               </div>
             ),
@@ -307,13 +300,8 @@ export function AiChatbotPage() {
               <Send className="size-5" strokeWidth={2.2} />
             </button>
           </div>
-          <div className="mt-3 flex flex-col gap-1 text-[11px] text-[#888888] sm:flex-row sm:justify-between">
+          <div className="mt-3 text-[11px] text-[#888888]">
             <p>DineIntel AI can make mistakes. Verify critical data.</p>
-            {lastModel ? (
-              <p className="font-medium uppercase tracking-wide sm:text-right">
-                Model: {lastModel}
-              </p>
-            ) : null}
           </div>
         </div>
       </footer>

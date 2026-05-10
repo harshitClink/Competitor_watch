@@ -2,9 +2,9 @@ import { Crown } from "lucide-react";
 import Link from "next/link";
 
 /**
- * @param {{ content: string, citations?: { restaurant_ids?: number[] }|null, modelVersion?: string|null }} props
+ * @param {{ content: string, citations?: { restaurant_ids?: number[] }|null }} props
  */
-export function AiAnalysisMessage({ content, citations, modelVersion }) {
+export function AiAnalysisMessage({ content, citations }) {
   const ids = citations?.restaurant_ids;
 
   return (
@@ -41,10 +41,6 @@ export function AiAnalysisMessage({ content, citations, modelVersion }) {
               ))}
             </ul>
           </div>
-        ) : null}
-
-        {modelVersion ? (
-          <p className="mt-4 text-[11px] text-[#888888]">Model: {modelVersion}</p>
         ) : null}
       </div>
     </div>

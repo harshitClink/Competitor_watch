@@ -12,10 +12,12 @@ import {
   ExternalLink,
   Megaphone,
   Radio,
+  Star,
 } from "lucide-react";
 import {
   getActivityFeed,
   getCurrentPilot,
+  getGoogleReviews,
   getMenuChanges,
   getPricingAnalysis,
   getRatingTrend,
@@ -83,6 +85,53 @@ function formatMenuEvent(e) {
   return { tag, date, priceLine };
 }
 
+function formatReviewAttrLabel(key) {
+  return key
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+/** @param {{ veg?: boolean | string | number | null }} props */
+function VegNonVegIcon({ veg }) {
+  const v =
+    veg === true ||
+    veg === 1 ||
+    (typeof veg === "string" && veg.toLowerCase() === "true");
+  const nv =
+    veg === false ||
+    veg === 0 ||
+    (typeof veg === "string" && veg.toLowerCase() === "false");
+  if (v) {
+    return (
+      <span
+        className="mt-0.5 inline-flex size-[15px] shrink-0 items-center justify-center rounded-[2px] border-[1.5px] border-[#0F7A40]"
+        title="Vegetarian"
+        aria-label="Vegetarian"
+      >
+        <span className="size-[7px] rounded-full bg-[#0F7A40]" />
+      </span>
+    );
+  }
+  if (nv) {
+    return (
+      <span
+        className="mt-0.5 inline-flex size-[15px] shrink-0 items-center justify-center rounded-[2px] border-[1.5px] border-[#C62828]"
+        title="Non-vegetarian"
+        aria-label="Non-vegetarian"
+      >
+        <svg
+          viewBox="0 0 10 10"
+          className="size-2 shrink-0 fill-[#C62828]"
+          aria-hidden
+        >
+          <polygon points="5,1 9,9 1,9" />
+        </svg>
+      </span>
+    );
+  }
+  return null;
+}
+
 export function CompetitorDetailPage({ slug }) {
   const router = useRouter();
   const restaurantId = Number.parseInt(String(slug), 10);
@@ -100,6 +149,9 @@ export function CompetitorDetailPage({ slug }) {
   const [menuMeta, setMenuMeta] = useState(null);
   const [socialPosts, setSocialPosts] = useState([]);
   const [serp, setSerp] = useState(null);
+  const [googleReviews, setGoogleReviews] = useState(null);
+  const [googleReviewsLoading, setGoogleReviewsLoading] = useState(true);
+  const [googleReviewsError, setGoogleReviewsError] = useState(null);
   const [loadError, setLoadError] = useState(null);
   const [profileLoading, setProfileLoading] = useState(true);
   const [feedFilter, setFeedFilter] = useState("all");
@@ -300,6 +352,32 @@ export function CompetitorDetailPage({ slug }) {
     };
   }, [restaurantId]);
 
+  useEffect(() => {
+    if (!Number.isFinite(restaurantId)) return;
+    let cancelled = false;
+    (async () => {
+      await Promise.resolve();
+      if (cancelled) return;
+      setGoogleReviews(null);
+      setGoogleReviewsLoading(true);
+      setGoogleReviewsError(null);
+      try {
+        const data = await getGoogleReviews(restaurantId, "7d", 20);
+        if (!cancelled) setGoogleReviews(data);
+      } catch (e) {
+        if (!cancelled) {
+          setGoogleReviews(null);
+          setGoogleReviewsError(e.message || "Could not load Google reviews");
+        }
+      } finally {
+        if (!cancelled) setGoogleReviewsLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [restaurantId]);
+
   const isPilot = pilotRestaurantId === restaurantId;
 
   const headerTitle = restaurant?.name ?? (Number.isFinite(restaurantId) ? `Restaurant ${restaurantId}` : "—");
@@ -331,6 +409,16 @@ export function CompetitorDetailPage({ slug }) {
       );
     });
   }, [activityEvents, feedFilter]);
+
+  const googleBreakdownMax = useMemo(() => {
+    const rd = googleReviews?.summary?.rating_breakdown;
+    if (!rd || typeof rd !== "object") return 1;
+    const vals = [1, 2, 3, 4, 5].map((s) =>
+      Number(rd[s] ?? rd[String(s)] ?? 0),
+    );
+    const m = Math.max(0, ...vals);
+    return m > 0 ? m : 1;
+  }, [googleReviews]);
 
   if (invalidId) {
     return (
@@ -563,6 +651,164 @@ export function CompetitorDetailPage({ slug }) {
           </section>
         </div>
 
+        <section className="mt-8 rounded-2xl border border-[#E5E0D6] bg-white p-5 shadow-sm sm:p-6">
+          <div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between sm:gap-4">
+            <h2 className="text-sm font-bold sm:text-base">Google reviews</h2>
+            {googleReviews?.since ? (
+              <p className="text-xs text-[#888888]">
+                From {googleReviews.since} · last 7 days · up to 20 reviews
+              </p>
+            ) : (
+              <p className="text-xs text-[#888888]">
+                Last 7 days · up to 20 reviews
+              </p>
+            )}
+          </div>
+
+          {googleReviewsLoading ? (
+            <ApiLoader
+              message="Loading Google reviews…"
+              size="compact"
+              className="mt-4 py-10"
+            />
+          ) : googleReviewsError ? (
+            <p className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+              {googleReviewsError}
+            </p>
+          ) : (
+            <>
+              {googleReviews?.summary ? (
+                <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  <div className="rounded-xl border border-[#EFEBE4] bg-[#FAFAF7] p-4">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-[#888888]">
+                      Reviews (window)
+                    </p>
+                    <p className="mt-1 text-2xl font-bold text-[#2D2926]">
+                      {googleReviews.summary.count ?? 0}
+                    </p>
+                  </div>
+                  <div className="rounded-xl border border-[#EFEBE4] bg-[#FAFAF7] p-4">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-[#888888]">
+                      Avg. rating (window)
+                    </p>
+                    <p className="mt-1 flex items-center gap-1.5 text-2xl font-bold text-[#2D2926]">
+                      <Star
+                        className="size-6 fill-[#FFD700] text-[#FFD700]"
+                        aria-hidden
+                      />
+                      {googleReviews.summary.avg_rating != null
+                        ? Number(googleReviews.summary.avg_rating).toFixed(2)
+                        : "—"}
+                    </p>
+                  </div>
+                  <div className="rounded-xl border border-[#EFEBE4] bg-[#FAFAF7] p-4 sm:col-span-2 lg:col-span-1">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-[#888888]">
+                      Star breakdown
+                    </p>
+                    <ul className="mt-3 flex flex-col gap-2">
+                      {[5, 4, 3, 2, 1].map((star) => {
+                        const rd =
+                          googleReviews.summary.rating_breakdown ?? {};
+                        const cnt = Number(rd[star] ?? rd[String(star)] ?? 0);
+                        const pct =
+                          googleBreakdownMax > 0
+                            ? Math.round((cnt / googleBreakdownMax) * 100)
+                            : 0;
+                        return (
+                          <li
+                            key={star}
+                            className="flex items-center gap-2 text-xs"
+                          >
+                            <span className="w-8 shrink-0 font-semibold text-[#666666]">
+                              {star}★
+                            </span>
+                            <div className="h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-[#E8E4DC]">
+                              <div
+                                className="h-full rounded-full bg-[#5C6B47]"
+                                style={{ width: `${pct}%` }}
+                              />
+                            </div>
+                            <span className="w-6 shrink-0 text-right font-medium text-[#2D2926]">
+                              {cnt}
+                            </span>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </div>
+                </div>
+              ) : null}
+
+              <ul className="mt-6 flex flex-col gap-4">
+                {(googleReviews?.reviews ?? []).length === 0 ? (
+                  <li className="text-sm text-[#666666]">
+                    No Google reviews in this window.
+                  </li>
+                ) : (
+                  googleReviews.reviews.map((rev) => (
+                    <li
+                      key={rev.review_id}
+                      className="rounded-xl border border-[#EFEBE4] bg-[#FAFAF7] p-4"
+                    >
+                      <div className="flex flex-wrap items-baseline justify-between gap-2">
+                        <div>
+                          <p className="font-bold text-[#2D2926]">
+                            {rev.reviewer_name || "Anonymous"}
+                            {rev.local_guide ? (
+                              <span className="ml-2 inline-block rounded-md border border-[#C4BFB2] bg-white px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-[#666666]">
+                                Local Guide
+                              </span>
+                            ) : null}
+                          </p>
+                          <p className="mt-1 text-xs text-[#888888]">
+                            {rev.date_raw || "—"}
+                            {rev.scrapped_at_date
+                              ? ` · ${rev.scrapped_at_date}`
+                              : ""}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-1 text-sm font-bold text-[#2D2926]">
+                          <Star
+                            className="size-4 fill-[#FFD700] text-[#FFD700]"
+                            aria-hidden
+                          />
+                          {rev.rating != null ? rev.rating : "—"}
+                        </div>
+                      </div>
+                      {rev.review_text ? (
+                        <p className="mt-3 text-sm leading-relaxed text-[#444]">
+                          {rev.review_text}
+                        </p>
+                      ) : null}
+                      {rev.likes != null && rev.likes > 0 ? (
+                        <p className="mt-2 text-xs text-[#666666]">
+                          {rev.likes} likes
+                        </p>
+                      ) : null}
+                      {rev.attributes &&
+                      Object.keys(rev.attributes).length > 0 ? (
+                        <ul className="mt-3 flex flex-wrap gap-2">
+                          {Object.entries(rev.attributes).map(([k, v]) => (
+                            <li
+                              key={k}
+                              className="rounded-lg border border-[#E0DDD4] bg-white px-2 py-1 text-[11px] text-[#444]"
+                            >
+                              <span className="font-semibold text-[#666666]">
+                                {formatReviewAttrLabel(k)}:{" "}
+                              </span>
+                              {String(v)}
+                            </li>
+                          ))}
+                        </ul>
+                      ) : null}
+                    </li>
+                  ))
+                )}
+              </ul>
+            </>
+          )}
+        </section>
+
         <div className="mt-8 grid gap-5 lg:grid-cols-2">
           <section className="rounded-2xl border border-[#E5E0D6] bg-white p-5 shadow-sm sm:p-6">
             <h2 className="text-sm font-bold sm:text-base">
@@ -605,7 +851,7 @@ export function CompetitorDetailPage({ slug }) {
             </h2>
             {menuMeta?.scrapped_at_date ? (
               <p className="mt-1 text-xs text-[#888888]">
-                Scraped {menuMeta.scrapped_at_date}
+                As of {menuMeta.scrapped_at_date}
               </p>
             ) : null}
             <ul className="mt-4 flex max-h-[420px] flex-col divide-y divide-[#EFEBE4] overflow-y-auto">
@@ -614,11 +860,48 @@ export function CompetitorDetailPage({ slug }) {
               ) : (
                 menuItems.slice(0, 80).map((item) => (
                   <li key={item.id} className="py-3 first:pt-0">
-                    <p className="font-semibold text-[#2D2926]">{item.name}</p>
-                    <p className="text-xs text-[#666666]">
-                      {[item.category, item.subcategory].filter(Boolean).join(" · ")} ·{" "}
-                      {item.price_raw || (item.price != null ? `₹${item.price}` : "—")}
-                    </p>
+                    <div className="flex items-start gap-2.5">
+                      <VegNonVegIcon veg={item.veg} />
+                      <div className="min-w-0 flex-1">
+                        <p className="font-semibold text-[#2D2926]">{item.name}</p>
+                        <p className="text-xs text-[#666666]">
+                          {[item.category, item.subcategory]
+                            .filter(Boolean)
+                            .join(" · ")}
+                          {item.category || item.subcategory ? " · " : ""}
+                          {item.price_raw ||
+                            (item.price != null ? `₹${item.price}` : "—")}
+                        </p>
+                        {item.rating != null &&
+                        item.rating !== "" ? (
+                          <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-[#666666]">
+                            <span className="inline-flex items-center gap-0.5 font-medium text-[#2D2926]">
+                              <Star
+                                className="size-3.5 fill-[#FFD700] text-[#FFD700]"
+                                aria-hidden
+                              />
+                              {item.rating}
+                            </span>
+                            {item.rating_count != null ? (
+                              <span>
+                                ({Number(item.rating_count).toLocaleString()}{" "}
+                                {Number(item.rating_count) === 1
+                                  ? "rating"
+                                  : "ratings"}
+                                )
+                              </span>
+                            ) : null}
+                          </p>
+                        ) : item.rating_count != null ? (
+                          <p className="mt-1 text-xs text-[#666666]">
+                            {Number(item.rating_count).toLocaleString()}{" "}
+                            {Number(item.rating_count) === 1
+                              ? "rating"
+                              : "ratings"}
+                          </p>
+                        ) : null}
+                      </div>
+                    </div>
                   </li>
                 ))
               )}

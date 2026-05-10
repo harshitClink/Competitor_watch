@@ -49,11 +49,7 @@ export function CompetitorSelection() {
         const list = sug?.suggestions ?? [];
         if (!cancelled) {
           setSuggestions(list);
-          const initial = new Set();
-          list.forEach((s) => {
-            if (s.restaurant_id != null) initial.add(s.restaurant_id);
-          });
-          setSelectedIds(initial);
+          setSelectedIds(new Set());
         }
       } catch (e) {
         if (!cancelled) {
