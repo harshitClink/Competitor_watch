@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { Fraunces } from "next/font/google";
 import { useRouter } from "next/navigation";
 import { Bell, FileText, Send, Zap } from "lucide-react";
 import {
@@ -17,6 +18,11 @@ import {
 import { AiAnalysisMessage } from "@/components/ai-analysis-message";
 import { ApiLoader } from "@/components/api-loading";
 import { ChatTypingIndicator } from "@/components/chat-typing-indicator";
+
+const fraunces = Fraunces({
+  subsets: ["latin"],
+  weight: ["600", "700"],
+});
 
 function createId() {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
@@ -170,7 +176,13 @@ export function AiChatbotPage() {
     <div className="flex h-[100dvh] flex-col bg-[#FDF8EE] text-[#2D2926]">
       <header className="z-40 shrink-0 border-b border-[#E8E4DC] bg-[#FAFAF7]/95 backdrop-blur-sm">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3 sm:px-6 lg:px-8">
-          <div className="flex min-w-0 items-center gap-2 sm:gap-4">
+          <div className="flex min-w-0 items-center gap-3 sm:gap-6">
+            <Link
+              href="/dashboard"
+              className={`${fraunces.className} shrink-0 text-lg font-semibold tracking-tight text-[#5C6B47] sm:text-xl`}
+            >
+              DineIntel
+            </Link>
             <nav
               className="flex min-w-0 items-center gap-3 overflow-x-auto text-sm sm:gap-6"
               aria-label="Main"

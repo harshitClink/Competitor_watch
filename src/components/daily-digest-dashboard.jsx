@@ -255,11 +255,12 @@ export function DailyDigestDashboard() {
       <header className="sticky top-0 z-40 border-b border-[#E8E4DC] bg-[#FAFAF7]/95 backdrop-blur-sm">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3 sm:px-6 lg:px-8">
           <div className="flex min-w-0 items-center gap-3">
-            <span
+            <Link
+              href="/dashboard"
               className={`${fraunces.className} text-lg font-semibold tracking-tight text-[#5C6B47] sm:text-xl`}
             >
-              Daily Digest
-            </span>
+              DineIntel
+            </Link>
           </div>
 
           <nav className="hidden items-center gap-8 md:flex" aria-label="Main">

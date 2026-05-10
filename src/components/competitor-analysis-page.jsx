@@ -149,7 +149,7 @@ export function CompetitorAnalysisPage() {
               href="/dashboard"
               className={`${fraunces.className} truncate text-lg font-semibold tracking-tight text-[#5C6B47] sm:text-xl`}
             >
-              Daily Digest
+              DineIntel
             </Link>
           </div>
 
