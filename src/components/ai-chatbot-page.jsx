@@ -554,8 +554,7 @@ export function AiChatbotPage() {
                       How can I help you today?
                     </h1>
                     <p className="mt-2 max-w-md text-sm text-[#666666] sm:text-base">
-                      Ask questions about your pilot restaurant and tracked competitors. Replies
-                      use live API data on the backend. Your first message becomes the chat title.
+                      Ask questions about your pilot restaurant and tracked competitors.
                     </p>
                     {suggestedData?.pilot_name ? (
                       <p className="mt-3 max-w-md text-xs text-[#888888]">
