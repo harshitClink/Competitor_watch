@@ -253,8 +253,8 @@ export function DailyDigestDashboard() {
   return (
     <div className="min-h-screen bg-[#FDF8EE] pb-24 text-[#2D2926]">
       <header className="sticky top-0 z-40 border-b border-[#E8E4DC] bg-[#FAFAF7]/95 backdrop-blur-sm">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3 sm:px-6 lg:px-8">
-          <div className="flex min-w-0 items-center gap-3">
+        <div className="mx-auto grid max-w-6xl grid-cols-[1fr_auto_1fr] items-center gap-3 px-4 py-3 sm:px-6 lg:px-8">
+          <div className="flex min-w-0 justify-start">
             <Link
               href="/dashboard"
               className={`${fraunces.className} text-lg font-semibold tracking-tight text-[#5C6B47] sm:text-xl`}
@@ -263,7 +263,10 @@ export function DailyDigestDashboard() {
             </Link>
           </div>
 
-          <nav className="hidden items-center gap-8 md:flex" aria-label="Main">
+          <nav
+            className="hidden items-center gap-6 sm:gap-8 md:flex"
+            aria-label="Main"
+          >
             <span className="border-b-2 border-[#5C6B47] pb-0.5 text-sm font-semibold text-[#2D2926]">
               Daily Digest
             </span>
@@ -281,7 +284,7 @@ export function DailyDigestDashboard() {
             </Link>
           </nav>
 
-          <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+          <div className="flex min-w-0 shrink-0 items-center justify-end gap-2 sm:gap-3">
             <Link
               href="/add-competitor"
               className="hidden rounded-lg bg-[#5C6B47] px-3 py-2 text-xs font-semibold text-white shadow-sm sm:inline-flex sm:px-4 sm:text-sm"

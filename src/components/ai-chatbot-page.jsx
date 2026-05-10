@@ -175,37 +175,38 @@ export function AiChatbotPage() {
   return (
     <div className="flex h-[100dvh] flex-col bg-[#FDF8EE] text-[#2D2926]">
       <header className="z-40 shrink-0 border-b border-[#E8E4DC] bg-[#FAFAF7]/95 backdrop-blur-sm">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3 sm:px-6 lg:px-8">
-          <div className="flex min-w-0 items-center gap-3 sm:gap-6">
+        <div className="mx-auto grid max-w-6xl grid-cols-[1fr_auto_1fr] items-center gap-3 px-4 py-3 sm:px-6 lg:px-8">
+          <div className="flex min-w-0 justify-start">
             <Link
               href="/dashboard"
-              className={`${fraunces.className} shrink-0 text-lg font-semibold tracking-tight text-[#5C6B47] sm:text-xl`}
+              className={`${fraunces.className} text-lg font-semibold tracking-tight text-[#5C6B47] sm:text-xl`}
             >
               DineIntel
             </Link>
-            <nav
-              className="flex min-w-0 items-center gap-3 overflow-x-auto text-sm sm:gap-6"
-              aria-label="Main"
-            >
-              <Link
-                href="/dashboard"
-                className="whitespace-nowrap font-medium text-[#666666] hover:text-[#2D2926]"
-              >
-                Daily Digest
-              </Link>
-              <span className="whitespace-nowrap border-b-2 border-[#D4AF37] pb-0.5 font-semibold text-[#2D2926]">
-                AI Chatbot
-              </span>
-              <Link
-                href="/competitor-analysis"
-                className="whitespace-nowrap font-medium text-[#666666] hover:text-[#2D2926]"
-              >
-                Competitor Analysis
-              </Link>
-            </nav>
           </div>
 
-          <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+          <nav
+            className="flex items-center gap-4 overflow-x-auto text-sm sm:gap-8"
+            aria-label="Main"
+          >
+            <Link
+              href="/dashboard"
+              className="whitespace-nowrap font-medium text-[#666666] transition-colors hover:text-[#2D2926]"
+            >
+              Daily Digest
+            </Link>
+            <span className="whitespace-nowrap border-b-2 border-[#5C6B47] pb-0.5 font-semibold text-[#2D2926]">
+              AI Chatbot
+            </span>
+            <Link
+              href="/competitor-analysis"
+              className="whitespace-nowrap font-medium text-[#666666] transition-colors hover:text-[#2D2926]"
+            >
+              Competitor Analysis
+            </Link>
+          </nav>
+
+          <div className="flex min-w-0 shrink-0 items-center justify-end gap-2 sm:gap-3">
             <Link
               href="/add-competitor"
               className="hidden rounded-lg bg-[#FFD700] px-3 py-2 text-xs font-bold text-black shadow-sm sm:inline-flex sm:px-4 sm:text-sm"
