@@ -161,6 +161,15 @@ export function getDailyDigest(pilotId, date) {
   );
 }
 
+export function getReviewsDigest(pilotId, date) {
+  const params = new URLSearchParams();
+  if (date) params.set("date", date);
+  const q = params.toString();
+  return apiFetch(
+    `/pilot_restaurants/${pilotId}/reviews_digest${q ? `?${q}` : ""}`,
+  );
+}
+
 export function listDailyDigests(pilotId, from, to) {
   const params = new URLSearchParams();
   if (from) params.set("from", from);

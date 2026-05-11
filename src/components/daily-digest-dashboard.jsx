@@ -17,6 +17,7 @@ import {
   getDailyDigest,
   getLeaderboard,
   getLeaderboardHistory,
+  getReviewsDigest,
   listDailyDigests,
   setStoredPilotRestaurantId,
 } from "@/lib/api";
@@ -107,6 +108,7 @@ export function DailyDigestDashboard() {
   const [reviewsDigest, setReviewsDigest] = useState(null);
   const [digestList, setDigestList] = useState([]);
   const [digestError, setDigestError] = useState(null);
+  const [reviewsDigestError, setReviewsDigestError] = useState(null);
   const [history, setHistory] = useState(null);
   const [leaderboardNames, setLeaderboardNames] = useState({});
   const [loadError, setLoadError] = useState(null);
@@ -156,22 +158,33 @@ export function DailyDigestDashboard() {
     (async () => {
       setDigestLoading(true);
       setDigestError(null);
+      setReviewsDigestError(null);
       try {
-        const data = await getDailyDigest(pilotRecordId, selectedDate);
-        if (!cancelled) {
-          setDigest(data?.daily_digest ?? null);
-          setReviewsDigest(
-            data?.reviews_digest ??
-              data?.daily_digest?.reviews_digest ??
-              null,
-          );
-        }
-      } catch (e) {
-        if (!cancelled) {
+        const [dailyRes, reviewsRes] = await Promise.allSettled([
+          getDailyDigest(pilotRecordId, selectedDate),
+          getReviewsDigest(pilotRecordId, selectedDate),
+        ]);
+        if (cancelled) return;
+
+        if (dailyRes.status === "fulfilled") {
+          setDigest(dailyRes.value?.daily_digest ?? null);
+        } else {
           setDigest(null);
+          const e = dailyRes.reason;
+          if (e?.code !== "no_digest") {
+            setDigestError(e?.message || "Could not load digest");
+          }
+        }
+
+        if (reviewsRes.status === "fulfilled") {
+          setReviewsDigest(reviewsRes.value?.reviews_digest ?? null);
+        } else {
           setReviewsDigest(null);
-          if (e.code !== "no_digest") {
-            setDigestError(e.message || "Could not load digest");
+          const e = reviewsRes.reason;
+          if (e?.code !== "no_digest") {
+            setReviewsDigestError(
+              e?.message || "Could not load reviews digest",
+            );
           }
         }
       } finally {
@@ -570,6 +583,8 @@ export function DailyDigestDashboard() {
 
           {digestLoading ? (
             <ApiLoader message="Loading reviews digest…" size="section" className="min-h-[100px]" />
+          ) : reviewsDigestError ? (
+            <p className="text-sm text-red-700">{reviewsDigestError}</p>
           ) : !reviewsDigest ? (
             <p className="text-sm text-[#666666]">
               No reviews digest for this date yet.
