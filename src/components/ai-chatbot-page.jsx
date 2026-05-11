@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import {
   ChevronLeft,
   FileText,
+  Menu,
   MessageSquare,
   Plus,
   Send,
@@ -29,6 +30,7 @@ import {
 import { AiAnalysisMessage } from "@/components/ai-analysis-message";
 import { ApiLoader } from "@/components/api-loading";
 import { ChatTypingIndicator } from "@/components/chat-typing-indicator";
+import { MobileAppNavDrawer } from "@/components/mobile-app-nav-drawer";
 
 const fraunces = Fraunces({
   subsets: ["latin"],
@@ -137,6 +139,7 @@ export function AiChatbotPage() {
   const [suggestionsError, setSuggestionsError] = useState(null);
   const [suggestionPhase, setSuggestionPhase] = useState("categories");
   const [pickedCategory, setPickedCategory] = useState(null);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const listRef = useRef(null);
 
   const scrollToBottom = useCallback(() => {
@@ -149,6 +152,20 @@ export function AiChatbotPage() {
   useEffect(() => {
     scrollToBottom();
   }, [messages, scrollToBottom]);
+
+  useEffect(() => {
+    if (!historyOpen) return;
+    const onKey = (e) => {
+      if (e.key === "Escape") setHistoryOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prev;
+    };
+  }, [historyOpen]);
 
   const refreshSessions = useCallback(async (pilotId) => {
     if (pilotId == null) return;
@@ -249,6 +266,7 @@ export function AiChatbotPage() {
     setMessages([]);
     clearStoredChatSessionId();
     setHistoryOpen(false);
+    setMobileNavOpen(false);
     setSuggestionPhase("categories");
     setPickedCategory(null);
   }, []);
@@ -260,6 +278,7 @@ export function AiChatbotPage() {
         return;
       }
       setHistoryOpen(false);
+      setMobileNavOpen(false);
       setSessionSwitching(true);
       setLoadError(null);
       setMessages([]);
@@ -410,19 +429,36 @@ export function AiChatbotPage() {
 
   return (
     <div className="flex h-[100dvh] flex-col bg-[#FDF8EE] text-[#2D2926]">
+      <MobileAppNavDrawer
+        open={mobileNavOpen}
+        onClose={() => setMobileNavOpen(false)}
+        active="chat"
+        addButtonVariant="gold"
+      />
       <header className="z-40 shrink-0 border-b border-[#E8E4DC] bg-[#FAFAF7]/95 backdrop-blur-sm">
         <div className="mx-auto grid max-w-6xl grid-cols-[1fr_auto_1fr] items-center gap-3 px-4 py-3 sm:px-6 lg:px-8">
-          <div className="flex min-w-0 justify-start">
+          <div className="flex min-w-0 items-center justify-start gap-1">
+            <button
+              type="button"
+              className="rounded-lg p-2 text-[#2D2926] hover:bg-[#F0EBE3] md:hidden"
+              aria-label="Open menu"
+              onClick={() => {
+                setHistoryOpen(false);
+                setMobileNavOpen(true);
+              }}
+            >
+              <Menu className="size-6" aria-hidden />
+            </button>
             <Link
               href="/dashboard"
-              className={`${fraunces.className} text-lg font-semibold tracking-tight text-[#5C6B47] sm:text-xl`}
+              className={`${fraunces.className} min-w-0 truncate text-lg font-semibold tracking-tight text-[#5C6B47] sm:text-xl`}
             >
               DineIntel
             </Link>
           </div>
 
           <nav
-            className="flex items-center gap-4 overflow-x-auto text-sm sm:gap-8"
+            className="hidden items-center gap-4 overflow-x-auto text-sm sm:gap-8 md:flex"
             aria-label="Main"
           >
             <Link
@@ -445,7 +481,10 @@ export function AiChatbotPage() {
           <div className="flex min-w-0 shrink-0 items-center justify-end gap-1 sm:gap-3">
             <button
               type="button"
-              onClick={() => setHistoryOpen(true)}
+              onClick={() => {
+                setMobileNavOpen(false);
+                setHistoryOpen(true);
+              }}
               className="inline-flex items-center gap-1.5 rounded-lg px-2 py-2 text-xs font-semibold text-[#5C6B47] hover:bg-[#F0EBE3] lg:hidden"
               aria-label="Open chat history"
             >
@@ -485,7 +524,7 @@ export function AiChatbotPage() {
         </aside>
 
         {historyOpen ? (
-          <div className="fixed inset-0 z-50 lg:hidden">
+          <div className="fixed inset-0 z-[90] lg:hidden">
             <button
               type="button"
               className="absolute inset-0 bg-black/40"

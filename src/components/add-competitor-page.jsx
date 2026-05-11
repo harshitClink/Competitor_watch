@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import {
   MapPin,
+  Menu,
   Plus,
   Search,
   UserMinus,
@@ -21,6 +22,7 @@ import {
   setStoredPilotRestaurantId,
 } from "@/lib/api";
 import { ApiLoader } from "@/components/api-loading";
+import { MobileAppNavDrawer } from "@/components/mobile-app-nav-drawer";
 import { restaurantImageSrc } from "@/lib/restaurant-image";
 
 function formatMemberSource(source) {
@@ -41,6 +43,7 @@ export function AddCompetitorPage() {
   const [actionError, setActionError] = useState(null);
   const [pendingId, setPendingId] = useState(null);
   const [pageLoading, setPageLoading] = useState(true);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   useEffect(() => {
     const t = window.setTimeout(() => setDebouncedQ(query.trim()), 320);
@@ -164,16 +167,31 @@ export function AddCompetitorPage() {
 
   return (
     <div className="min-h-screen bg-[#FDF8EE] text-[#2D2926]">
+      <MobileAppNavDrawer
+        open={mobileNavOpen}
+        onClose={() => setMobileNavOpen(false)}
+        active={null}
+      />
       <header className="border-b border-[#E8E4DC] bg-[#FAFAF7]/90 backdrop-blur-sm">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
-          <Link
-            href="/dashboard"
-            className="text-sm font-semibold text-[#5C6B47] hover:underline"
-          >
-            ← Back
-          </Link>
-          <span className="text-sm font-bold text-[#2D2926]">Add Competitor</span>
-          <span className="w-14 sm:w-20" aria-hidden />
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-2 px-4 py-4 sm:px-6 lg:px-8">
+          <div className="flex min-w-0 flex-1 items-center gap-2">
+            <button
+              type="button"
+              className="shrink-0 rounded-lg p-2 text-[#2D2926] hover:bg-[#F0EBE3] md:hidden"
+              aria-label="Open menu"
+              onClick={() => setMobileNavOpen(true)}
+            >
+              <Menu className="size-6" aria-hidden />
+            </button>
+            <Link
+              href="/dashboard"
+              className="min-w-0 truncate text-sm font-semibold text-[#5C6B47] hover:underline"
+            >
+              ← Back
+            </Link>
+          </div>
+          <span className="shrink-0 text-sm font-bold text-[#2D2926]">Add Competitor</span>
+          <span className="w-10 shrink-0 sm:w-16" aria-hidden />
         </div>
       </header>
 

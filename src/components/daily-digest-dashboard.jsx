@@ -6,6 +6,7 @@ import { Fraunces } from "next/font/google";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
+  Menu,
   Plus,
   Sparkles,
   Zap,
@@ -19,6 +20,7 @@ import {
   setStoredPilotRestaurantId,
 } from "@/lib/api";
 import { ApiLoader } from "@/components/api-loading";
+import { MobileAppNavDrawer } from "@/components/mobile-app-nav-drawer";
 
 const LeaderboardScoreChart = dynamic(
   () =>
@@ -110,6 +112,7 @@ export function DailyDigestDashboard() {
   const [digestLoading, setDigestLoading] = useState(false);
   const [digestListLoading, setDigestListLoading] = useState(false);
   const [historyLoading, setHistoryLoading] = useState(false);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   const loadPilot = useCallback(async () => {
     setLoadError(null);
@@ -251,12 +254,25 @@ export function DailyDigestDashboard() {
 
   return (
     <div className="min-h-screen bg-[#FDF8EE] pb-24 text-[#2D2926]">
+      <MobileAppNavDrawer
+        open={mobileNavOpen}
+        onClose={() => setMobileNavOpen(false)}
+        active="digest"
+      />
       <header className="sticky top-0 z-40 border-b border-[#E8E4DC] bg-[#FAFAF7]/95 backdrop-blur-sm">
         <div className="mx-auto grid max-w-6xl grid-cols-[1fr_auto_1fr] items-center gap-3 px-4 py-3 sm:px-6 lg:px-8">
-          <div className="flex min-w-0 justify-start">
+          <div className="flex min-w-0 items-center justify-start gap-1">
+            <button
+              type="button"
+              className="rounded-lg p-2 text-[#2D2926] hover:bg-[#F0EBE3] md:hidden"
+              aria-label="Open menu"
+              onClick={() => setMobileNavOpen(true)}
+            >
+              <Menu className="size-6" aria-hidden />
+            </button>
             <Link
               href="/dashboard"
-              className={`${fraunces.className} text-lg font-semibold tracking-tight text-[#5C6B47] sm:text-xl`}
+              className={`${fraunces.className} min-w-0 truncate text-lg font-semibold tracking-tight text-[#5C6B47] sm:text-xl`}
             >
               DineIntel
             </Link>
