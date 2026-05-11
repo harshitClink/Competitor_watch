@@ -9,6 +9,7 @@ import {
   Menu,
   Plus,
   Sparkles,
+  Star,
   Zap,
 } from "lucide-react";
 import {
@@ -103,6 +104,7 @@ export function DailyDigestDashboard() {
     return t.toISOString().slice(0, 10);
   });
   const [digest, setDigest] = useState(null);
+  const [reviewsDigest, setReviewsDigest] = useState(null);
   const [digestList, setDigestList] = useState([]);
   const [digestError, setDigestError] = useState(null);
   const [history, setHistory] = useState(null);
@@ -156,10 +158,18 @@ export function DailyDigestDashboard() {
       setDigestError(null);
       try {
         const data = await getDailyDigest(pilotRecordId, selectedDate);
-        if (!cancelled) setDigest(data?.daily_digest ?? null);
+        if (!cancelled) {
+          setDigest(data?.daily_digest ?? null);
+          setReviewsDigest(
+            data?.reviews_digest ??
+              data?.daily_digest?.reviews_digest ??
+              null,
+          );
+        }
       } catch (e) {
         if (!cancelled) {
           setDigest(null);
+          setReviewsDigest(null);
           if (e.code !== "no_digest") {
             setDigestError(e.message || "Could not load digest");
           }
@@ -251,6 +261,38 @@ export function DailyDigestDashboard() {
   const generatedAt = digest?.generated_at
     ? new Date(digest.generated_at).toLocaleString()
     : null;
+
+  const reviewsDigestRestaurants = useMemo(() => {
+    const list = reviewsDigest?.restaurants;
+    if (!Array.isArray(list)) return [];
+    return [...list].sort((a, b) => {
+      if (a.role === "pilot" && b.role !== "pilot") return -1;
+      if (a.role !== "pilot" && b.role === "pilot") return 1;
+      return (a.restaurant_name || "").localeCompare(b.restaurant_name || "");
+    });
+  }, [reviewsDigest]);
+
+  const reviewsDigestGeneratedAt = reviewsDigest?.generated_at
+    ? new Date(reviewsDigest.generated_at).toLocaleString()
+    : null;
+
+  const digestListUnique = useMemo(() => {
+    const map = new Map();
+    for (const d of digestList) {
+      const date = d.digest_date;
+      if (date == null || date === "") continue;
+      const prev = map.get(date);
+      if (!prev) {
+        map.set(date, d);
+      } else {
+        map.set(date, {
+          ...prev,
+          quiet_day: Boolean(prev.quiet_day || d.quiet_day),
+        });
+      }
+    }
+    return [...map.values()];
+  }, [digestList]);
 
   return (
     <div className="min-h-screen bg-[#FDF8EE] pb-24 text-[#2D2926]">
@@ -389,8 +431,8 @@ export function DailyDigestDashboard() {
               <ApiLoader message="Loading dates…" size="compact" className="mt-4 justify-start py-6" />
             ) : null}
             <ul className="mt-3 flex flex-col gap-1">
-              {digestList.map((d) => (
-                <li key={d.id}>
+              {digestListUnique.map((d) => (
+                <li key={d.digest_date}>
                   <button
                     type="button"
                     onClick={() => setSelectedDate(d.digest_date)}
@@ -410,7 +452,7 @@ export function DailyDigestDashboard() {
                 </li>
               ))}
             </ul>
-            {digestList.length === 0 ? (
+            {!digestListLoading && digestListUnique.length === 0 ? (
               <p className="mt-2 text-xs text-[#888888]">No past digests.</p>
             ) : null}
           </aside>
@@ -491,6 +533,148 @@ export function DailyDigestDashboard() {
                   </div>
                 </Link>
               ))}
+            </div>
+          )}
+        </section>
+
+        <section className="mt-8 lg:mt-10" aria-labelledby="reviews-digest-heading">
+          <div className="mb-4 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <h2 id="reviews-digest-heading" className="text-lg font-bold sm:text-xl">
+                Reviews digest
+              </h2>
+              <p className="mt-1 max-w-2xl text-xs text-[#666666] sm:text-sm">
+                Past summaries from Google reviews for your pilot and tracked competitors on this
+                digest day.
+              </p>
+            </div>
+            {reviewsDigest?.digest_date ? (
+              <p className="text-xs text-[#888888]">
+                Digest day:{" "}
+                <span className="font-semibold text-[#2D2926]">{reviewsDigest.digest_date}</span>
+                {reviewsDigestGeneratedAt ? (
+                  <>
+                    {" "}
+                    · Generated {reviewsDigestGeneratedAt}
+                  </>
+                ) : null}
+                {reviewsDigest.status ? (
+                  <>
+                    {" "}
+                    · {reviewsDigest.status}
+                  </>
+                ) : null}
+              </p>
+            ) : null}
+          </div>
+
+          {digestLoading ? (
+            <ApiLoader message="Loading reviews digest…" size="section" className="min-h-[100px]" />
+          ) : !reviewsDigest ? (
+            <p className="text-sm text-[#666666]">
+              No reviews digest for this date yet.
+            </p>
+          ) : reviewsDigestRestaurants.length === 0 ? (
+            <p className="text-sm text-[#666666]">No venues in this reviews digest.</p>
+          ) : (
+            <div className="flex flex-col gap-4">
+              {reviewsDigestRestaurants.map((r) => {
+                const isPilot = r.role === "pilot";
+                const reviews = Array.isArray(r.reviews) ? r.reviews : [];
+                const rid = r.restaurant_id;
+                return (
+                  <article
+                    key={rid}
+                    className="overflow-hidden rounded-2xl border border-[#E5E0D6] bg-white shadow-sm"
+                  >
+                    <div className="border-b border-[#EFEBE4] bg-[#FAFAF7] px-4 py-3 sm:px-5 sm:py-4">
+                      <div className="flex flex-wrap items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          {rid != null ? (
+                            <Link
+                              href={`/competitor/${rid}`}
+                              className="text-base font-bold text-[#5C6B47] hover:underline sm:text-lg"
+                            >
+                              {r.restaurant_name || `Restaurant ${rid}`}
+                            </Link>
+                          ) : (
+                            <p className="text-base font-bold text-[#2D2926] sm:text-lg">
+                              {r.restaurant_name || "—"}
+                            </p>
+                          )}
+                          <p className="mt-1 text-xs text-[#666666]">
+                            {r.returned_reviews ?? reviews.length} of {r.total_reviews ?? "—"}{" "}
+                            reviews sampled
+                          </p>
+                        </div>
+                        <span
+                          className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide ${
+                            isPilot
+                              ? "bg-[#5C6B47] text-white"
+                              : "border border-[#D4CFC4] bg-white text-[#666666]"
+                          }`}
+                        >
+                          {isPilot ? "Pilot" : "Competitor"}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="px-4 py-4 sm:px-5 sm:py-5">
+                      {r.summary ? (
+                        <p className="text-sm leading-relaxed text-[#444] sm:text-[15px]">
+                          {r.summary}
+                        </p>
+                      ) : (
+                        <p className="text-sm text-[#888888]">No summary for this venue.</p>
+                      )}
+                      {reviews.length > 0 ? (
+                        <details className="group mt-4">
+                          <summary className="cursor-pointer list-none text-sm font-semibold text-[#5C6B47] marker:hidden [&::-webkit-details-marker]:hidden">
+                            <span className="underline-offset-2 group-open:underline">
+                              Show {reviews.length}{" "}
+                              {reviews.length === 1 ? "review" : "reviews"}
+                            </span>
+                          </summary>
+                          <ul className="mt-3 flex flex-col gap-3 border-t border-[#EFEBE4] pt-3">
+                            {reviews.map((rev) => (
+                              <li
+                                key={rev.review_id || `${rev.reviewer_name}-${rev.date_raw}`}
+                                className="rounded-xl border border-[#EFEBE4] bg-[#FAFAF7] p-3 sm:p-4"
+                              >
+                                <div className="flex flex-wrap items-baseline justify-between gap-2">
+                                  <p className="text-sm font-semibold text-[#2D2926]">
+                                    {rev.reviewer_name || "Anonymous"}
+                                    {rev.local_guide ? (
+                                      <span className="ml-2 text-[9px] font-bold uppercase tracking-wide text-[#888888]">
+                                        · Local Guide
+                                      </span>
+                                    ) : null}
+                                  </p>
+                                  <div className="flex items-center gap-1 text-sm font-bold text-[#2D2926]">
+                                    <Star
+                                      className="size-3.5 fill-[#FFD700] text-[#FFD700]"
+                                      aria-hidden
+                                    />
+                                    {rev.rating != null ? rev.rating : "—"}
+                                  </div>
+                                </div>
+                                <p className="mt-1 text-[11px] text-[#888888]">{rev.date_raw || "—"}</p>
+                                {rev.review_text ? (
+                                  <p className="mt-2 text-sm leading-relaxed text-[#444]">
+                                    {rev.review_text}
+                                  </p>
+                                ) : null}
+                                {rev.likes != null && rev.likes > 0 ? (
+                                  <p className="mt-2 text-xs text-[#666666]">{rev.likes} likes</p>
+                                ) : null}
+                              </li>
+                            ))}
+                          </ul>
+                        </details>
+                      ) : null}
+                    </div>
+                  </article>
+                );
+              })}
             </div>
           )}
         </section>
