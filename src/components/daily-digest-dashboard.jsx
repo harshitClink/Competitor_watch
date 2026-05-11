@@ -60,6 +60,14 @@ function formatDigestDate(iso) {
   });
 }
 
+function previousIsoDate(iso) {
+  if (!iso) return iso;
+  const d = new Date(`${iso}T12:00:00`);
+  if (Number.isNaN(d.getTime())) return iso;
+  d.setDate(d.getDate() - 1);
+  return d.toISOString().slice(0, 10);
+}
+
 function buildHistoryChart(history, leaderboardNames) {
   if (!history || typeof history !== "object") {
     return { chartData: [], lineKeys: [] };
@@ -160,9 +168,10 @@ export function DailyDigestDashboard() {
       setDigestError(null);
       setReviewsDigestError(null);
       try {
+        const reviewsDate = previousIsoDate(selectedDate);
         const [dailyRes, reviewsRes] = await Promise.allSettled([
           getDailyDigest(pilotRecordId, selectedDate),
-          getReviewsDigest(pilotRecordId, selectedDate),
+          getReviewsDigest(pilotRecordId, reviewsDate),
         ]);
         if (cancelled) return;
 
